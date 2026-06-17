@@ -1,0 +1,75 @@
+{
+  "fakeStores": [
+    {
+      "id": "F-0001",
+      "name": "A가품매장",
+      "address": "서울특별시 강남구 강남대로 일대",
+      "lat": 37.4979,
+      "lng": 127.0276,
+      "status": "조사중",
+      "step": "Step 2",
+      "department": "현장조사팀",
+      "owner": "홍길동"
+    },
+    {
+      "id": "F-0002",
+      "name": "B가품매장",
+      "address": "서울특별시 중구 명동 일대",
+      "lat": 37.5636,
+      "lng": 126.982,
+      "status": "의심",
+      "step": "Step 1",
+      "department": "영업팀",
+      "owner": "김가품"
+    },
+    {
+      "id": "F-0003",
+      "name": "C가품매장",
+      "address": "서울특별시 송파구 잠실 일대",
+      "lat": 37.5133,
+      "lng": 127.1002,
+      "status": "가품확정",
+      "step": "Step 4",
+      "department": "법무팀",
+      "owner": "이가품"
+    }
+  ],
+  "ourStores": [
+    {
+      "id": "O-0001",
+      "name": "강남점",
+      "address": "서울특별시 강남구 강남역 인근",
+      "lat": 37.5001,
+      "lng": 127.027,
+      "monthlySales": 120000000,
+      "owner": "박담당"
+    },
+    {
+      "id": "O-0002",
+      "name": "역삼점",
+      "address": "서울특별시 강남구 역삼역 인근",
+      "lat": 37.501,
+      "lng": 127.0396,
+      "monthlySales": 90000000,
+      "owner": "최담당"
+    },
+    {
+      "id": "O-0003",
+      "name": "명동점",
+      "address": "서울특별시 중구 명동 인근",
+      "lat": 37.5632,
+      "lng": 126.985,
+      "monthlySales": 150000000,
+      "owner": "정담당"
+    },
+    {
+      "id": "O-0004",
+      "name": "잠실점",
+      "address": "서울특별시 송파구 잠실역 인근",
+      "lat": 37.5139,
+      "lng": 127.1025,
+      "monthlySales": 110000000,
+      "owner": "한담당"
+    }
+  ]
+}
