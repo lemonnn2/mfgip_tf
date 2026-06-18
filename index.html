@@ -1,9 +1,11 @@
 <!doctype html>
+
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>가품매장 지도 MVP</title>
+
   <style>
     * { box-sizing: border-box; }
 
@@ -43,12 +45,12 @@
 
     .notice {
       padding: 10px 12px;
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
       border-radius: 12px;
       font-size: 12px;
       line-height: 1.5;
-      color: #9a3412;
+      color: #1d4ed8;
       margin-bottom: 14px;
     }
 
@@ -123,7 +125,9 @@
       font-weight: 700;
     }
 
-    button:hover { background: #f9fafb; }
+    button:hover {
+      background: #f9fafb;
+    }
 
     .section-title {
       font-size: 14px;
@@ -243,9 +247,20 @@
       padding-top: 8px;
     }
 
-    .impact-high { color: #dc2626; font-weight: 800; }
-    .impact-mid { color: #d97706; font-weight: 800; }
-    .impact-low { color: #059669; font-weight: 800; }
+    .impact-high {
+      color: #dc2626;
+      font-weight: 800;
+    }
+
+    .impact-mid {
+      color: #d97706;
+      font-weight: 800;
+    }
+
+    .impact-low {
+      color: #059669;
+      font-weight: 800;
+    }
 
     @media (max-width: 900px) {
       .app {
@@ -264,6 +279,7 @@
       }
     }
   </style>
+
 </head>
 
 <body>
@@ -271,56 +287,59 @@
     <aside class="sidebar">
       <h1 class="title">가품매장 지도 MVP</h1>
 
-      <div class="subtitle">
-        파란색 우리매장을 클릭하면 반경 5km 안에 있는 가품매장 수와 목록이 표시됩니다.<br />
-        빨간색 가품매장을 클릭하면 반경 5km 안에 있는 우리매장과 매출 영향도를 확인할 수 있습니다.
-      </div>
+```
+  <div class="subtitle">
+    파란색 우리매장을 클릭하면 반경 5km 안에 있는 가품매장 수와 목록이 표시됩니다.<br />
+    빨간색 가품매장을 클릭하면 반경 5km 안에 있는 우리매장과 매출 영향도를 확인할 수 있습니다.
+  </div>
 
-      <div class="notice">
-        실행 전 <b>YOUR_KAKAO_JAVASCRIPT_KEY</b>를 본인의 카카오 JavaScript 키로 교체하세요.
-      </div>
+  <div class="notice">
+    <b>map-data.json</b> 파일을 이 HTML 파일과 같은 폴더에 두세요.
+  </div>
 
-      <div class="legend">
-        <span class="legend-item"><span class="dot fake"></span>영업중 가품매장</span>
-        <span class="legend-item"><span class="dot fake-closed"></span>종료 가품매장</span>
-        <span class="legend-item"><span class="dot our"></span>우리매장</span>
-      </div>
+  <div class="legend">
+    <span class="legend-item"><span class="dot fake"></span>영업중 가품매장</span>
+    <span class="legend-item"><span class="dot fake-closed"></span>종료 가품매장</span>
+    <span class="legend-item"><span class="dot our"></span>우리매장</span>
+  </div>
 
-      <div class="metric-grid">
-        <div class="metric">
-          <div class="label">가품매장</div>
-          <div class="value" id="fakeCount">-</div>
-        </div>
-        <div class="metric">
-          <div class="label">우리매장</div>
-          <div class="value" id="ourCount">-</div>
-        </div>
-      </div>
+  <div class="metric-grid">
+    <div class="metric">
+      <div class="label">가품매장</div>
+      <div class="value" id="fakeCount">-</div>
+    </div>
+    <div class="metric">
+      <div class="label">우리매장</div>
+      <div class="value" id="ourCount">-</div>
+    </div>
+  </div>
 
-      <div class="controls">
-        <select id="statusFilter">
-          <option value="ALL">조사상태 전체</option>
-        </select>
+  <div class="controls">
+    <select id="statusFilter">
+      <option value="ALL">조사상태 전체</option>
+    </select>
 
-        <select id="operatingFilter">
-          <option value="ALL">영업여부 전체</option>
-        </select>
+    <select id="operatingFilter">
+      <option value="ALL">영업여부 전체</option>
+    </select>
 
-        <select id="stepFilter">
-          <option value="ALL">Step 전체</option>
-        </select>
+    <select id="stepFilter">
+      <option value="ALL">Step 전체</option>
+    </select>
 
-        <button id="resetBtn">전체 지도 보기</button>
-      </div>
+    <button id="resetBtn">전체 지도 보기</button>
+  </div>
 
-      <div class="section-title">우리매장 목록</div>
-      <div class="store-list" id="ourStoreList"></div>
+  <div class="section-title">우리매장 목록</div>
+  <div class="store-list" id="ourStoreList"></div>
 
-      <div class="section-title">가품매장 목록</div>
-      <div class="store-list" id="fakeStoreList"></div>
-    </aside>
+  <div class="section-title">가품매장 목록</div>
+  <div class="store-list" id="fakeStoreList"></div>
+</aside>
 
-    <main id="map"></main>
+<main id="map"></main>
+```
+
   </div>
 
   <script>
@@ -349,16 +368,24 @@
 
     function loadKakaoSdk() {
       return new Promise((resolve, reject) => {
-        if (!KAKAO_JAVASCRIPT_KEY || KAKAO_JAVASCRIPT_KEY === "403572f9beaf29324230415c29e983c1") {
+        if (!KAKAO_JAVASCRIPT_KEY || KAKAO_JAVASCRIPT_KEY === "YOUR_KAKAO_JAVASCRIPT_KEY") {
           reject(new Error("카카오 JavaScript 키를 입력하세요."));
           return;
         }
 
         const script = document.getElementById("kakao-sdk");
+
         script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JAVASCRIPT_KEY}&autoload=false&libraries=services`;
 
         script.onload = () => {
-          kakao.maps.load(() => resolve());
+          if (!window.kakao || !window.kakao.maps) {
+            reject(new Error("카카오맵 객체를 찾지 못했습니다."));
+            return;
+          }
+
+          kakao.maps.load(() => {
+            resolve();
+          });
         };
 
         script.onerror = () => {
@@ -533,14 +560,16 @@
 
       const center = new kakao.maps.LatLng(fakeStore.lat, fakeStore.lng);
 
+      const circleColor = fakeStore.operatingStatus === "종료" ? "#6b7280" : "#ef4444";
+
       radiusCircle = new kakao.maps.Circle({
         center,
         radius: RADIUS_METER,
         strokeWeight: 2,
-        strokeColor: fakeStore.operatingStatus === "종료" ? "#6b7280" : "#ef4444",
+        strokeColor: circleColor,
         strokeOpacity: 0.9,
         strokeStyle: "solid",
-        fillColor: fakeStore.operatingStatus === "종료" ? "#6b7280" : "#ef4444",
+        fillColor: circleColor,
         fillOpacity: 0.12
       });
 
@@ -835,6 +864,7 @@
     function fakeOperatingBadge(store) {
       const label = store.operatingStatus === "종료" ? "종료" : "영업중";
       const className = store.operatingStatus === "종료" ? "badge badge-closed" : "badge badge-open";
+
       return `<span class="${className}">${label}</span>`;
     }
 
@@ -877,11 +907,12 @@
         document.getElementById("resetBtn").onclick = fitAllMarkers;
       } catch (err) {
         console.error(err);
-        alert("지도 로딩에 실패했습니다. 카카오 JavaScript 키, 도메인 등록, map-data.json 위치를 확인하세요.");
+        alert(err.message);
       }
     }
 
     main();
   </script>
+
 </body>
 </html>
