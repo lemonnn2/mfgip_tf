@@ -183,11 +183,12 @@
       background: #e5e7eb;
     }
 
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-
+#map {
+  width: 100%;
+  height: 100vh;
+  min-height: 640px;
+  background: #e5e7eb;
+}
     .info-window {
       padding: 10px 12px;
       width: 340px;
@@ -262,23 +263,28 @@
       font-weight: 800;
     }
 
-    @media (max-width: 900px) {
-      .app {
-        grid-template-columns: 1fr;
-        grid-template-rows: 420px 1fr;
-      }
+@media (max-width: 900px) {
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
 
-      .sidebar {
-        order: 2;
-        border-right: none;
-        border-top: 1px solid #e5e7eb;
-      }
+  #map {
+    order: 1;
+    width: 100%;
+    height: 420px;
+    min-height: 420px;
+    background: #e5e7eb;
+  }
 
-      #map {
-        order: 1;
-      }
-    }
-  </style>
+  .sidebar {
+    order: 2;
+    border-right: none;
+    border-top: 1px solid #e5e7eb;
+  }
+}  </style>
 
 </head>
 
@@ -407,14 +413,20 @@
       ourStores = data.ourStores || [];
     }
 
-    function initMap() {
-      const center = new kakao.maps.LatLng(37.4979, 127.0276);
+ function initMap() {
+  const mapContainer = document.getElementById("map");
+  const center = new kakao.maps.LatLng(37.4979, 127.0276);
 
-      map = new kakao.maps.Map(document.getElementById("map"), {
-        center,
-        level: 7
-      });
-    }
+  map = new kakao.maps.Map(mapContainer, {
+    center,
+    level: 7
+  });
+
+  setTimeout(() => {
+    map.relayout();
+    map.setCenter(center);
+  }, 300);
+}
 
     function markerImage(color) {
       const svg = `
