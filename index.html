@@ -6,128 +6,41 @@
   <title>가품매장 지도 MVP</title>
   <style>
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: #111827;
       background: #f3f4f6;
     }
+
     .app {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 380px 1fr;
       height: 100vh;
       min-height: 640px;
     }
+
     .sidebar {
       background: #ffffff;
       border-right: 1px solid #e5e7eb;
       overflow-y: auto;
       padding: 18px;
     }
+
     .title {
       font-size: 20px;
       font-weight: 800;
       margin: 0 0 6px;
     }
+
     .subtitle {
       font-size: 13px;
       color: #6b7280;
       line-height: 1.5;
       margin-bottom: 16px;
     }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .metric {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 12px;
-      background: #fafafa;
-    }
-    .metric .label {
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .metric .value {
-      font-size: 24px;
-      font-weight: 800;
-      margin-top: 4px;
-    }
-    .controls {
-      display: grid;
-      gap: 10px;
-      margin-bottom: 18px;
-    }
-    select, button {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 10px;
-      background: #fff;
-      font-size: 14px;
-    }
-    button {
-      cursor: pointer;
-      font-weight: 700;
-    }
-    button:hover { background: #f9fafb; }
-    .section-title {
-      font-size: 14px;
-      font-weight: 800;
-      margin: 18px 0 10px;
-    }
-    .store-list {
-      display: grid;
-      gap: 10px;
-    }
-    .store-card {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 12px;
-      background: #fff;
-      cursor: pointer;
-    }
-    .store-card:hover {
-      border-color: #9ca3af;
-      background: #f9fafb;
-    }
-    .store-name {
-      font-weight: 800;
-      margin-bottom: 4px;
-    }
-    .store-meta {
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 1.5;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    .legend {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      font-size: 12px;
-      color: #4b5563;
-      margin-bottom: 12px;
-    }
-    .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      display: inline-block;
-    }
-    .dot.fake { background: #ef4444; }
-    .dot.our { background: #2563eb; }
+
     .notice {
       padding: 10px 12px;
       background: #fff7ed;
@@ -138,21 +51,198 @@
       color: #9a3412;
       margin-bottom: 14px;
     }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #4b5563;
+      margin-bottom: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dot.fake { background: #ef4444; }
+    .dot.fake-closed { background: #6b7280; }
+    .dot.our { background: #2563eb; }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    .metric .label {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .metric .value {
+      font-size: 24px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    select, button {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover { background: #f9fafb; }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin: 18px 0 10px;
+    }
+
+    .store-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .store-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .store-card:hover {
+      border-color: #9ca3af;
+      background: #f9fafb;
+    }
+
+    .store-name {
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .store-meta {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-right: 4px;
+    }
+
+    .badge-open {
+      color: #991b1b;
+      background: #fee2e2;
+    }
+
+    .badge-closed {
+      color: #374151;
+      background: #e5e7eb;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
     .info-window {
       padding: 10px 12px;
-      width: 260px;
+      width: 340px;
+      max-height: 390px;
+      overflow-y: auto;
       line-height: 1.45;
     }
+
     .info-title {
       font-weight: 800;
       font-size: 15px;
       margin-bottom: 6px;
     }
+
     .info-row {
       font-size: 12px;
       color: #374151;
       margin: 2px 0;
     }
+
+    .nearby-summary {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .nearby-list {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .nearby-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 12px;
+      color: #374151;
+    }
+
+    .nearby-item:last-child {
+      border-bottom: none;
+    }
+
+    .nearby-name {
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+
+    .empty-nearby {
+      font-size: 12px;
+      color: #6b7280;
+      padding-top: 8px;
+    }
+
     .impact-high { color: #dc2626; font-weight: 800; }
     .impact-mid { color: #d97706; font-weight: 800; }
     .impact-low { color: #059669; font-weight: 800; }
@@ -162,23 +252,28 @@
         grid-template-columns: 1fr;
         grid-template-rows: 420px 1fr;
       }
+
       .sidebar {
         order: 2;
         border-right: none;
         border-top: 1px solid #e5e7eb;
       }
+
       #map {
         order: 1;
       }
     }
   </style>
 </head>
+
 <body>
   <div class="app">
     <aside class="sidebar">
       <h1 class="title">가품매장 지도 MVP</h1>
+
       <div class="subtitle">
-        가품매장을 클릭하면 반경 5km 원과 주변 우리 매장 정보가 표시됩니다.
+        파란색 우리매장을 클릭하면 반경 5km 안에 있는 가품매장 수와 목록이 표시됩니다.<br />
+        빨간색 가품매장을 클릭하면 반경 5km 안에 있는 우리매장과 매출 영향도를 확인할 수 있습니다.
       </div>
 
       <div class="notice">
@@ -186,7 +281,8 @@
       </div>
 
       <div class="legend">
-        <span class="legend-item"><span class="dot fake"></span>가품매장</span>
+        <span class="legend-item"><span class="dot fake"></span>영업중 가품매장</span>
+        <span class="legend-item"><span class="dot fake-closed"></span>종료 가품매장</span>
         <span class="legend-item"><span class="dot our"></span>우리매장</span>
       </div>
 
@@ -203,13 +299,22 @@
 
       <div class="controls">
         <select id="statusFilter">
-          <option value="ALL">상태 전체</option>
+          <option value="ALL">조사상태 전체</option>
         </select>
+
+        <select id="operatingFilter">
+          <option value="ALL">영업여부 전체</option>
+        </select>
+
         <select id="stepFilter">
           <option value="ALL">Step 전체</option>
         </select>
+
         <button id="resetBtn">전체 지도 보기</button>
       </div>
+
+      <div class="section-title">우리매장 목록</div>
+      <div class="store-list" id="ourStoreList"></div>
 
       <div class="section-title">가품매장 목록</div>
       <div class="store-list" id="fakeStoreList"></div>
@@ -218,58 +323,66 @@
     <main id="map"></main>
   </div>
 
-  <!-- 1) 여기에 카카오 JavaScript 키를 넣으세요. -->
   <script>
-    const KAKAO_JAVASCRIPT_KEY = "7bdfd0f38d636fab7c8f04dd0c509f40";
+    const KAKAO_JAVASCRIPT_KEY = "403572f9beaf29324230415c29e983c1";
   </script>
 
-  <!-- 2) 카카오맵 SDK 로드 -->
   <script id="kakao-sdk"></script>
 
   <script>
     const DATA_FILE = "./map-data.json";
     const RADIUS_METER = 5000;
+    const RADIUS_KM = 5;
 
     let map;
-    let kakaoLoaded = false;
     let fakeStores = [];
     let ourStores = [];
+
     let fakeMarkers = [];
     let ourMarkers = [];
+
+    let fakeMarkerMap = new Map();
+    let ourMarkerMap = new Map();
+
     let radiusCircle = null;
     let activeInfoWindow = null;
 
     function loadKakaoSdk() {
       return new Promise((resolve, reject) => {
-        if (!KAKAO_JAVASCRIPT_KEY || KAKAO_JAVASCRIPT_KEY === "YOUR_KAKAO_JAVASCRIPT_KEY") {
+        if (!KAKAO_JAVASCRIPT_KEY || KAKAO_JAVASCRIPT_KEY === "403572f9beaf29324230415c29e983c1") {
           reject(new Error("카카오 JavaScript 키를 입력하세요."));
           return;
         }
 
         const script = document.getElementById("kakao-sdk");
         script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JAVASCRIPT_KEY}&autoload=false&libraries=services`;
+
         script.onload = () => {
-          kakao.maps.load(() => {
-            kakaoLoaded = true;
-            resolve();
-          });
+          kakao.maps.load(() => resolve());
         };
-        script.onerror = () => reject(new Error("카카오맵 SDK 로드 실패"));
+
+        script.onerror = () => {
+          reject(new Error("카카오맵 SDK 로드 실패"));
+        };
       });
     }
 
     async function loadData() {
       const res = await fetch(DATA_FILE, { cache: "no-store" });
+
       if (!res.ok) {
         throw new Error("map-data.json을 불러오지 못했습니다.");
       }
+
       const data = await res.json();
+
       fakeStores = data.fakeStores || [];
       ourStores = data.ourStores || [];
     }
 
     function initMap() {
       const center = new kakao.maps.LatLng(37.4979, 127.0276);
+
       map = new kakao.maps.Map(document.getElementById("map"), {
         center,
         level: 7
@@ -283,7 +396,9 @@
           <circle cx="18" cy="18" r="7" fill="white"/>
         </svg>
       `;
+
       const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
+
       return new kakao.maps.MarkerImage(url, new kakao.maps.Size(36, 48), {
         offset: new kakao.maps.Point(18, 48)
       });
@@ -292,31 +407,35 @@
     function renderMarkers() {
       clearMarkers();
 
-      const status = document.getElementById("statusFilter").value;
-      const step = document.getElementById("stepFilter").value;
+      const visibleFakeStores = getVisibleFakeStores();
 
-      const visibleFakeStores = fakeStores.filter(store => {
-        const statusOk = status === "ALL" || store.status === status;
-        const stepOk = step === "ALL" || store.step === step;
-        return statusOk && stepOk;
-      });
-
-      const fakeImage = markerImage("#ef4444");
+      const fakeOpenImage = markerImage("#ef4444");
+      const fakeClosedImage = markerImage("#6b7280");
       const ourImage = markerImage("#2563eb");
 
       visibleFakeStores.forEach(store => {
+        if (!isValidCoordinate(store.lat, store.lng)) return;
+
+        const image = store.operatingStatus === "종료" ? fakeClosedImage : fakeOpenImage;
+
         const marker = new kakao.maps.Marker({
           map,
           position: new kakao.maps.LatLng(store.lat, store.lng),
           title: store.name,
-          image: fakeImage
+          image
         });
 
-        kakao.maps.event.addListener(marker, "click", () => selectFakeStore(store));
+        kakao.maps.event.addListener(marker, "click", () => {
+          selectFakeStore(store);
+        });
+
         fakeMarkers.push(marker);
+        fakeMarkerMap.set(getStoreKey(store), marker);
       });
 
       ourStores.forEach(store => {
+        if (!isValidCoordinate(store.lat, store.lng)) return;
+
         const marker = new kakao.maps.Marker({
           map,
           position: new kakao.maps.LatLng(store.lat, store.lng),
@@ -324,89 +443,216 @@
           image: ourImage
         });
 
-        kakao.maps.event.addListener(marker, "click", () => showOurStoreInfo(store, marker));
+        kakao.maps.event.addListener(marker, "click", () => {
+          selectOurStore(store);
+        });
+
         ourMarkers.push(marker);
+        ourMarkerMap.set(getStoreKey(store), marker);
       });
 
+      renderOurStoreList();
       renderFakeStoreList(visibleFakeStores);
     }
 
     function clearMarkers() {
       fakeMarkers.forEach(marker => marker.setMap(null));
       ourMarkers.forEach(marker => marker.setMap(null));
+
       fakeMarkers = [];
       ourMarkers = [];
+
+      fakeMarkerMap = new Map();
+      ourMarkerMap = new Map();
     }
 
-    function selectFakeStore(fakeStore) {
-      const center = new kakao.maps.LatLng(fakeStore.lat, fakeStore.lng);
+    function clearSelection() {
+      if (radiusCircle) {
+        radiusCircle.setMap(null);
+        radiusCircle = null;
+      }
 
-      if (radiusCircle) radiusCircle.setMap(null);
-      if (activeInfoWindow) activeInfoWindow.close();
+      if (activeInfoWindow) {
+        activeInfoWindow.close();
+        activeInfoWindow = null;
+      }
+    }
+
+    function getVisibleFakeStores() {
+      const status = document.getElementById("statusFilter").value;
+      const operatingStatus = document.getElementById("operatingFilter").value;
+      const step = document.getElementById("stepFilter").value;
+
+      return fakeStores.filter(store => {
+        const statusOk = status === "ALL" || store.status === status;
+        const operatingOk = operatingStatus === "ALL" || store.operatingStatus === operatingStatus;
+        const stepOk = step === "ALL" || store.step === step;
+
+        return statusOk && operatingOk && stepOk;
+      });
+    }
+
+    function selectOurStore(ourStore) {
+      if (!isValidCoordinate(ourStore.lat, ourStore.lng)) return;
+
+      clearSelection();
+
+      const center = new kakao.maps.LatLng(ourStore.lat, ourStore.lng);
 
       radiusCircle = new kakao.maps.Circle({
         center,
         radius: RADIUS_METER,
         strokeWeight: 2,
-        strokeColor: "#ef4444",
+        strokeColor: "#2563eb",
         strokeOpacity: 0.9,
         strokeStyle: "solid",
-        fillColor: "#ef4444",
+        fillColor: "#2563eb",
         fillOpacity: 0.12
       });
+
       radiusCircle.setMap(map);
 
-      const nearby = getNearbyOurStores(fakeStore, ourStores, 5);
-      const impact = getImpactLevel(nearby);
+      const nearbyFakeStores = getNearbyFakeStores(ourStore, fakeStores, RADIUS_KM);
 
-      const marker = fakeMarkers.find(m => m.getTitle() === fakeStore.name);
-      const content = fakeStoreInfoHtml(fakeStore, nearby, impact);
+      const marker = ourMarkerMap.get(getStoreKey(ourStore));
+      const content = ourStoreInfoHtml(ourStore, nearbyFakeStores);
+
       activeInfoWindow = new kakao.maps.InfoWindow({ content });
-      if (marker) activeInfoWindow.open(map, marker);
+
+      if (marker) {
+        activeInfoWindow.open(map, marker);
+      }
 
       map.panTo(center);
     }
 
-    function showOurStoreInfo(store, marker) {
-      if (activeInfoWindow) activeInfoWindow.close();
+    function selectFakeStore(fakeStore) {
+      if (!isValidCoordinate(fakeStore.lat, fakeStore.lng)) return;
 
-      const content = `
-        <div class="info-window">
-          <div class="info-title">우리매장: ${escapeHtml(store.name)}</div>
-          <div class="info-row"><b>주소:</b> ${escapeHtml(store.address || "-")}</div>
-          <div class="info-row"><b>담당자:</b> ${escapeHtml(store.owner || "-")}</div>
-          <div class="info-row"><b>월매출:</b> ${formatCurrency(store.monthlySales)}</div>
-        </div>
-      `;
+      clearSelection();
+
+      const center = new kakao.maps.LatLng(fakeStore.lat, fakeStore.lng);
+
+      radiusCircle = new kakao.maps.Circle({
+        center,
+        radius: RADIUS_METER,
+        strokeWeight: 2,
+        strokeColor: fakeStore.operatingStatus === "종료" ? "#6b7280" : "#ef4444",
+        strokeOpacity: 0.9,
+        strokeStyle: "solid",
+        fillColor: fakeStore.operatingStatus === "종료" ? "#6b7280" : "#ef4444",
+        fillOpacity: 0.12
+      });
+
+      radiusCircle.setMap(map);
+
+      const nearbyOurStores = getNearbyOurStores(fakeStore, ourStores, RADIUS_KM);
+      const impact = getImpactLevel(nearbyOurStores);
+
+      const marker = fakeMarkerMap.get(getStoreKey(fakeStore));
+      const content = fakeStoreInfoHtml(fakeStore, nearbyOurStores, impact);
+
       activeInfoWindow = new kakao.maps.InfoWindow({ content });
-      activeInfoWindow.open(map, marker);
+
+      if (marker) {
+        activeInfoWindow.open(map, marker);
+      }
+
+      map.panTo(center);
     }
 
-    function fakeStoreInfoHtml(fakeStore, nearby, impact) {
-      const nearbyList = nearby.length
-        ? nearby.slice(0, 5).map(item => `<div class="info-row">- ${escapeHtml(item.name)}: ${item.distanceKm.toFixed(2)}km</div>`).join("")
-        : `<div class="info-row">반경 5km 내 우리매장 없음</div>`;
+    function ourStoreInfoHtml(ourStore, nearbyFakeStores) {
+      const nearbyList = nearbyFakeStores.length
+        ? nearbyFakeStores.map(item => `
+          <div class="nearby-item">
+            <div class="nearby-name">${escapeHtml(item.name)}</div>
+            <div>거리: ${item.distanceKm.toFixed(2)}km</div>
+            <div>영업여부: ${fakeOperatingBadge(item)} ${escapeHtml(getFakeOperatingLabel(item))}</div>
+            <div>조사상태: ${escapeHtml(item.status || "-")}</div>
+            <div>Step: ${escapeHtml(item.step || "-")}</div>
+            <div>주소: ${escapeHtml(item.address || "-")}</div>
+            <div>담당부서: ${escapeHtml(item.department || "-")}</div>
+            <div>담당자: ${escapeHtml(item.owner || "-")}</div>
+          </div>
+        `).join("")
+        : `<div class="empty-nearby">반경 5km 내 가품매장이 없습니다.</div>`;
 
-      const impactClass = impact === "높음" ? "impact-high" : impact === "중간" ? "impact-mid" : "impact-low";
+      return `
+        <div class="info-window">
+          <div class="info-title">우리매장: ${escapeHtml(ourStore.name)}</div>
+
+          <div class="info-row"><b>유통채널:</b> ${escapeHtml(ourStore.channel || "-")}</div>
+          <div class="info-row"><b>오픈일:</b> ${escapeHtml(ourStore.openDate || "-")}</div>
+          <div class="info-row"><b>주소:</b> ${escapeHtml(ourStore.address || "-")}</div>
+          <div class="info-row"><b>${escapeHtml(ourStore.salesMonth || "월")} 매출:</b> ${formatCurrency(ourStore.monthlySales)}</div>
+
+          <div class="nearby-summary">
+            반경 5km 내 가품매장 ${nearbyFakeStores.length}개
+          </div>
+
+          <div class="nearby-list">
+            ${nearbyList}
+          </div>
+        </div>
+      `;
+    }
+
+    function fakeStoreInfoHtml(fakeStore, nearbyOurStores, impact) {
+      const nearbyList = nearbyOurStores.length
+        ? nearbyOurStores.map(item => `
+          <div class="nearby-item">
+            <div class="nearby-name">${escapeHtml(item.name)}</div>
+            <div>거리: ${item.distanceKm.toFixed(2)}km</div>
+            <div>유통채널: ${escapeHtml(item.channel || "-")}</div>
+            <div>오픈일: ${escapeHtml(item.openDate || "-")}</div>
+            <div>주소: ${escapeHtml(item.address || "-")}</div>
+            <div>${escapeHtml(item.salesMonth || "월")} 매출: ${formatCurrency(item.monthlySales)}</div>
+          </div>
+        `).join("")
+        : `<div class="empty-nearby">반경 5km 내 우리매장이 없습니다.</div>`;
+
+      const impactClass =
+        impact === "높음" ? "impact-high" :
+        impact === "중간" ? "impact-mid" :
+        "impact-low";
 
       return `
         <div class="info-window">
           <div class="info-title">가품매장: ${escapeHtml(fakeStore.name)}</div>
+
+          <div class="info-row"><b>영업여부:</b> ${fakeOperatingBadge(fakeStore)} ${escapeHtml(getFakeOperatingLabel(fakeStore))}</div>
           <div class="info-row"><b>주소:</b> ${escapeHtml(fakeStore.address || "-")}</div>
-          <div class="info-row"><b>상태:</b> ${escapeHtml(fakeStore.status || "-")}</div>
+          <div class="info-row"><b>조사상태:</b> ${escapeHtml(fakeStore.status || "-")}</div>
           <div class="info-row"><b>Step:</b> ${escapeHtml(fakeStore.step || "-")}</div>
           <div class="info-row"><b>담당부서:</b> ${escapeHtml(fakeStore.department || "-")}</div>
           <div class="info-row"><b>담당자:</b> ${escapeHtml(fakeStore.owner || "-")}</div>
-          <div class="info-row"><b>5km 내 우리매장:</b> ${nearby.length}개</div>
-          <div class="info-row"><b>영향도:</b> <span class="${impactClass}">${impact}</span></div>
-          <hr />
-          ${nearbyList}
+
+          <div class="nearby-summary">
+            반경 5km 내 우리매장 ${nearbyOurStores.length}개<br />
+            영향도: <span class="${impactClass}">${impact}</span>
+          </div>
+
+          <div class="nearby-list">
+            ${nearbyList}
+          </div>
         </div>
       `;
     }
 
+    function getNearbyFakeStores(ourStore, stores, radiusKm) {
+      return stores
+        .filter(store => isValidCoordinate(store.lat, store.lng))
+        .map(store => ({
+          ...store,
+          distanceKm: distanceKm(ourStore.lat, ourStore.lng, store.lat, store.lng)
+        }))
+        .filter(store => store.distanceKm <= radiusKm)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+    }
+
     function getNearbyOurStores(fakeStore, stores, radiusKm) {
       return stores
+        .filter(store => isValidCoordinate(store.lat, store.lng))
         .map(store => ({
           ...store,
           distanceKm: distanceKm(fakeStore.lat, fakeStore.lng, store.lat, store.lng)
@@ -417,12 +663,16 @@
 
     function distanceKm(lat1, lng1, lat2, lng2) {
       const R = 6371;
-      const dLat = toRad(lat2 - lat1);
-      const dLng = toRad(lng2 - lng1);
+
+      const dLat = toRad(Number(lat2) - Number(lat1));
+      const dLng = toRad(Number(lng2) - Number(lng1));
+
       const a =
         Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.cos(toRad(Number(lat1))) *
+        Math.cos(toRad(Number(lat2))) *
         Math.sin(dLng / 2) ** 2;
+
       return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
@@ -433,15 +683,47 @@
     function getImpactLevel(nearbyStores) {
       const weightedSales = nearbyStores.reduce((sum, store) => {
         let weight = 0;
+
         if (store.distanceKm <= 1) weight = 1.0;
         else if (store.distanceKm <= 3) weight = 0.7;
         else if (store.distanceKm <= 5) weight = 0.4;
-        return sum + (Number(store.monthlySales || 0) * weight);
+
+        return sum + Number(store.monthlySales || 0) * weight;
       }, 0);
 
       if (nearbyStores.length >= 3 || weightedSales >= 150000000) return "높음";
       if (nearbyStores.length >= 1 || weightedSales >= 50000000) return "중간";
+
       return "낮음";
+    }
+
+    function renderOurStoreList() {
+      const list = document.getElementById("ourStoreList");
+      list.innerHTML = "";
+
+      if (!ourStores.length) {
+        list.innerHTML = `<div class="store-meta">등록된 우리매장이 없습니다.</div>`;
+        return;
+      }
+
+      ourStores.forEach(store => {
+        const nearbyFakeStores = getNearbyFakeStores(store, fakeStores, RADIUS_KM);
+
+        const card = document.createElement("div");
+        card.className = "store-card";
+
+        card.innerHTML = `
+          <div class="store-name">${escapeHtml(store.name)}</div>
+          <div class="store-meta">
+            ${escapeHtml(store.channel || "-")} · ${formatCurrency(store.monthlySales)}<br />
+            5km 내 가품매장 ${nearbyFakeStores.length}개
+          </div>
+        `;
+
+        card.onclick = () => selectOurStore(store);
+
+        list.appendChild(card);
+      });
     }
 
     function renderFakeStoreList(stores) {
@@ -454,33 +736,47 @@
       }
 
       stores.forEach(store => {
-        const nearby = getNearbyOurStores(store, ourStores, 5);
+        const nearbyOurStores = getNearbyOurStores(store, ourStores, RADIUS_KM);
+
         const card = document.createElement("div");
         card.className = "store-card";
+
         card.innerHTML = `
           <div class="store-name">${escapeHtml(store.name)}</div>
           <div class="store-meta">
+            ${fakeOperatingBadge(store)} ${escapeHtml(getFakeOperatingLabel(store))}<br />
             ${escapeHtml(store.status || "-")} · ${escapeHtml(store.step || "-")}<br />
-            5km 내 우리매장 ${nearby.length}개
+            5km 내 우리매장 ${nearbyOurStores.length}개
           </div>
         `;
+
         card.onclick = () => selectFakeStore(store);
+
         list.appendChild(card);
       });
     }
 
     function populateFilters() {
       const statusFilter = document.getElementById("statusFilter");
+      const operatingFilter = document.getElementById("operatingFilter");
       const stepFilter = document.getElementById("stepFilter");
 
-      const statuses = [...new Set(fakeStores.map(s => s.status).filter(Boolean))];
-      const steps = [...new Set(fakeStores.map(s => s.step).filter(Boolean))];
+      const statuses = [...new Set(fakeStores.map(store => store.status).filter(Boolean))];
+      const operatingStatuses = [...new Set(fakeStores.map(store => store.operatingStatus).filter(Boolean))];
+      const steps = [...new Set(fakeStores.map(store => store.step).filter(Boolean))];
 
       statuses.forEach(status => {
         const opt = document.createElement("option");
         opt.value = status;
         opt.textContent = status;
         statusFilter.appendChild(opt);
+      });
+
+      operatingStatuses.forEach(status => {
+        const opt = document.createElement("option");
+        opt.value = status;
+        opt.textContent = status;
+        operatingFilter.appendChild(opt);
       });
 
       steps.forEach(step => {
@@ -490,8 +786,20 @@
         stepFilter.appendChild(opt);
       });
 
-      statusFilter.onchange = renderMarkers;
-      stepFilter.onchange = renderMarkers;
+      statusFilter.onchange = () => {
+        clearSelection();
+        renderMarkers();
+      };
+
+      operatingFilter.onchange = () => {
+        clearSelection();
+        renderMarkers();
+      };
+
+      stepFilter.onchange = () => {
+        clearSelection();
+        renderMarkers();
+      };
     }
 
     function updateMetrics() {
@@ -500,19 +808,49 @@
     }
 
     function fitAllMarkers() {
-      if (activeInfoWindow) activeInfoWindow.close();
-      if (radiusCircle) radiusCircle.setMap(null);
+      clearSelection();
+
+      const allStores = [...fakeStores, ...ourStores]
+        .filter(store => isValidCoordinate(store.lat, store.lng));
+
+      if (!allStores.length) return;
 
       const bounds = new kakao.maps.LatLngBounds();
-      [...fakeStores, ...ourStores].forEach(store => {
+
+      allStores.forEach(store => {
         bounds.extend(new kakao.maps.LatLng(store.lat, store.lng));
       });
+
       map.setBounds(bounds);
+    }
+
+    function getFakeOperatingLabel(store) {
+      if (store.operatingStatus === "종료") {
+        return store.closedDate ? `${store.closedDate} 종료` : "종료";
+      }
+
+      return store.operatingStatus || "-";
+    }
+
+    function fakeOperatingBadge(store) {
+      const label = store.operatingStatus === "종료" ? "종료" : "영업중";
+      const className = store.operatingStatus === "종료" ? "badge badge-closed" : "badge badge-open";
+      return `<span class="${className}">${label}</span>`;
+    }
+
+    function getStoreKey(store) {
+      return String(store.id || `${store.name}-${store.lat}-${store.lng}`);
+    }
+
+    function isValidCoordinate(lat, lng) {
+      return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     }
 
     function formatCurrency(value) {
       const n = Number(value || 0);
+
       if (!n) return "-";
+
       return n.toLocaleString("ko-KR") + "원";
     }
 
@@ -529,21 +867,17 @@
       try {
         await loadKakaoSdk();
         await loadData();
+
         initMap();
         populateFilters();
         updateMetrics();
         renderMarkers();
         fitAllMarkers();
+
         document.getElementById("resetBtn").onclick = fitAllMarkers;
       } catch (err) {
-        document.body.innerHTML = `
-          <div style="padding:24px;font-family:sans-serif;">
-            <h2>지도 로딩 실패</h2>
-            <p>${escapeHtml(err.message)}</p>
-            <p>카카오 JavaScript 키, 도메인 등록, map-data.json 위치를 확인하세요.</p>
-          </div>
-        `;
         console.error(err);
+        alert("지도 로딩에 실패했습니다. 카카오 JavaScript 키, 도메인 등록, map-data.json 위치를 확인하세요.");
       }
     }
 
