@@ -1,5 +1,5 @@
-/* =====================================================================
-   가품매장 관제 지도
+﻿/* =====================================================================
+   가품 매장 침해대응 지도
    - 카카오 지도(services 라이브러리로 주소→좌표 지오코딩)
    - 엑셀/CSV 업로드로 데이터 갱신 (코드 수정 불필요)
    - 검색 / 필터 / 반경 조절 / 반경 내 상대매장 분석
@@ -29,10 +29,9 @@ let fakeMarkerMap = new Map();
 let ourMarkerMap = new Map();
 
 let radiusCircle = null;
-let activeInfoWindow = null;
 let radiusKm = 5;
 
-// 마커 클러스터러 (우리매장=파랑 계열, 가품매장=빨강 계열)
+// 마커 클러스터러 (정품매장=파랑 계열, 가품매장=빨강 계열)
 let ourClusterer = null;
 let fakeClusterer = null;
 
@@ -254,6 +253,20 @@ function renderMarkers() {
   renderOurStoreList(visibleOur);
   renderFakeStoreList(visibleFake);
   updateMetrics();
+  updateFilterPill(visibleFake.length);
+}
+
+/* 필터·검색으로 지도에서 숨겨진 가품매장 수를 배지로 알림 */
+function updateFilterPill(visibleCount) {
+  const pill = document.getElementById("filterPill");
+  if (!pill) return;
+  const hidden = fakeStores.length - visibleCount;
+  if (hidden > 0) {
+    pill.innerHTML = `필터로 가품매장 <b>${hidden}개</b> 숨김 · 전체 보기 ↺`;
+    pill.hidden = false;
+  } else {
+    pill.hidden = true;
+  }
 }
 
 function clearMarkers() {
@@ -267,7 +280,7 @@ function clearMarkers() {
 
 function clearSelection() {
   if (radiusCircle) { radiusCircle.setMap(null); radiusCircle = null; }
-  if (activeInfoWindow) { activeInfoWindow.close(); activeInfoWindow = null; }
+  hideDetail();
 }
 
 /* =====================================================================
@@ -291,19 +304,17 @@ function getVisibleFakeStores() {
   const type = document.getElementById("typeFilter").value;
   const operating = document.getElementById("operatingFilter").value;
   const area = document.getElementById("areaFilter").value;
-  const product = document.getElementById("productFilter").value;
 
   return fakeStores.filter(s => {
     const typeOk = type === "ALL" || s.type === type;
     const opOk = operating === "ALL" || operatingLabel(s) === operating;
     const areaOk = area === "ALL" || s.area === area;
-    const productOk = product === "ALL" || s.product === product;
-    return typeOk && opOk && areaOk && productOk && matchSearch(s);
+    return typeOk && opOk && areaOk && matchSearch(s);
   });
 }
 
 function getVisibleOurStores() {
-  // 우리매장은 검색어에만 반응 (필터는 가품 대상)
+  // 정품매장은 검색어에만 반응 (필터는 가품 대상)
   return ourStores.filter(matchSearch);
 }
 
@@ -311,7 +322,6 @@ function populateFilters() {
   fillSelect("typeFilter", "유형 전체", uniq(fakeStores.map(s => s.type)));
   fillSelect("operatingFilter", "영업여부 전체", uniq(fakeStores.map(operatingLabel)));
   fillSelect("areaFilter", "상권 전체", uniq(fakeStores.map(s => s.area)));
-  fillSelect("productFilter", "판매상품 전체", uniq(fakeStores.map(s => s.product)));
   buildChips();
 }
 
@@ -334,10 +344,17 @@ function buildChips() {
       chip.classList.add("active");
       // 칩 = 유형 필터와 동기화
       document.getElementById("typeFilter").value = chip.dataset.chip;
+      showFakeListTab();
       clearSelection();
       renderMarkers();
     };
   });
+}
+
+/* 필터는 가품매장 대상이므로, 결과가 보이도록 가품매장 목록 탭 활성화 */
+function showFakeListTab() {
+  const tab = document.querySelector('.list-tab[data-list="fake"]');
+  if (tab && !tab.classList.contains("active")) tab.click();
 }
 
 function fillSelect(id, allLabel, values) {
@@ -358,9 +375,11 @@ function bindControls() {
   const rerender = () => { clearSelection(); renderMarkers(); };
 
   // 필터 셀렉트 (유형 셀렉트는 칩과도 동기화)
-  ["typeFilter", "operatingFilter", "areaFilter", "productFilter"].forEach(id => {
+  // 필터는 가품매장 대상 → 변경 시 가품매장 목록 탭으로 전환해 결과가 바로 보이게 함
+  ["typeFilter", "operatingFilter", "areaFilter"].forEach(id => {
     document.getElementById(id).onchange = () => {
       if (id === "typeFilter") syncChipsFromSelect();
+      showFakeListTab();
       rerender();
     };
   });
@@ -389,7 +408,7 @@ function bindControls() {
   // 초기화
   document.getElementById("resetBtn").onclick = () => {
     searchInput.value = ""; searchClear.hidden = true;
-    ["typeFilter", "operatingFilter", "areaFilter", "productFilter"]
+    ["typeFilter", "operatingFilter", "areaFilter"]
       .forEach(id => (document.getElementById(id).value = "ALL"));
     syncChipsFromSelect();
     clearSelection();
@@ -415,6 +434,10 @@ function bindControls() {
       item.classList.add("active");
       const v = item.dataset.view;
 
+      // '현황'은 대시보드 오버레이 표시
+      if (v === "stats") { openStats(); return; }
+      closeStats();
+
       // '지도'는 목록 패널을 닫고 지도를 본다 (특히 모바일)
       if (v === "map") {
         if (isMobile()) closeMobilePanel();
@@ -423,14 +446,20 @@ function bindControls() {
         return;
       }
 
-      // 그 외(우리/가품/현황)는 패널 열기
+      // '목록'은 검색·목록 패널 열기 (정품매장/가품매장 전환은 패널 안 탭에서)
       openPanel();
-      if (v === "our" || v === "fake") {
-        const tab = document.querySelector(`.list-tab[data-list="${v}"]`);
-        if (tab) tab.click();
-      }
+      // 모바일: peek 상태로는 목록이 가려지므로 시트를 완전히 펼침
+      if (v === "list" && isMobile()) expandMobilePanel();
     };
   });
+
+  // 현황 닫기 → 지도 보기로 복귀
+  document.getElementById("statsClose").onclick = () => {
+    closeStats();
+    const mapItem = document.querySelector('.rail-item[data-view="map"]');
+    document.querySelectorAll(".rail-item[data-view]").forEach(x => x.classList.remove("active"));
+    if (mapItem) mapItem.classList.add("active");
+  };
 
   // 패널 접기/펼치기
   document.getElementById("panelToggle").onclick = () => {
@@ -453,17 +482,50 @@ function bindControls() {
     };
   });
 
-  // 내 위치
+  // 내 위치: 파란 점 마커를 찍고 그 위치로 확대 이동
   document.getElementById("locBtn").onclick = () => {
     if (!navigator.geolocation) { alert("이 브라우저는 위치 기능을 지원하지 않습니다."); return; }
+    const btn = document.getElementById("locBtn");
+    btn.classList.add("loading");
     navigator.geolocation.getCurrentPosition(
-      pos => map.panTo(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude)),
-      () => alert("위치 정보를 가져올 수 없습니다.")
+      pos => {
+        btn.classList.remove("loading");
+        btn.classList.add("active");
+        showMyLocation(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      },
+      err => {
+        btn.classList.remove("loading");
+        const why = err && err.code === 1
+          ? "브라우저에서 위치 권한을 허용해 주세요."
+          : "위치 정보를 가져올 수 없습니다.";
+        alert(why);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
   // 이 지역 다시 검색 = 전체 보기
   document.getElementById("searchHere").onclick = fitAllMarkers;
+
+  // 필터 배지 클릭 = 필터·검색 초기화(전체 보기)
+  document.getElementById("filterPill").onclick = () => document.getElementById("resetBtn").click();
+}
+
+/* 내 위치 마커 (파란 점 + 펄스) */
+let myLocOverlay = null;
+function showMyLocation(latlng) {
+  if (myLocOverlay) { myLocOverlay.setMap(null); myLocOverlay = null; }
+  const el = document.createElement("div");
+  el.className = "my-loc";
+  el.innerHTML = `
+    <div class="my-loc-pulse"></div>
+    <div class="my-loc-dot"></div>`;
+  myLocOverlay = new kakao.maps.CustomOverlay({
+    position: latlng, content: el, xAnchor: 0.5, yAnchor: 0.5, zIndex: 5
+  });
+  myLocOverlay.setMap(map);
+  if (map.getLevel() > 5) map.setLevel(5);
+  map.panTo(latlng);
 }
 
 /* 유형 셀렉트 값에 맞춰 상단 칩 active 동기화 */
@@ -496,10 +558,7 @@ function selectOurStore(store) {
   drawCircle(center, "#007AFF");
 
   const nearby = getNearby(store, fakeStores);
-  activeInfoWindow = new kakao.maps.InfoWindow({
-    content: ourInfoHtml(store, nearby), removable: true, position: center
-  });
-  openInfoAt(center);
+  showDetail(ourInfoHtml(store, nearby), center);
 }
 
 function selectFakeStore(store) {
@@ -510,22 +569,49 @@ function selectFakeStore(store) {
 
   const nearby = getNearby(store, ourStores);
   const impact = getImpactLevel(nearby);
-  activeInfoWindow = new kakao.maps.InfoWindow({
-    content: fakeInfoHtml(store, nearby, impact), removable: true, position: center
-  });
-  openInfoAt(center);
+  showDetail(fakeInfoHtml(store, nearby, impact), center);
 }
 
-/* 인포윈도우를 좌표 위치에 열고, 클러스터가 묶여 있으면 풀리도록 확대 */
-function openInfoAt(center) {
+/* 상세 카드를 열고, 클러스터가 묶여 있으면 풀리도록 확대.
+   (기존 지도 위 인포윈도우 대체: 화면 고정 카드라 내부 스크롤이 지도와 분리됨) */
+function showDetail(html, center) {
+  const body = document.getElementById("detailBody");
+  body.innerHTML = html;
+  body.scrollTop = 0;
+  document.getElementById("detailCard").hidden = false;
+
   // 모바일: 목록에서 선택하면 지도가 보이도록 패널을 닫음
   if (isMobile()) closeMobilePanel();
   // 클러스터 최소 레벨(6)보다 축소돼 있으면 개별 마커가 보이도록 확대
   if (map.getLevel() >= 6) map.setLevel(5, { anchor: center });
   setTimeout(() => {
-    activeInfoWindow.open(map);
     map.panTo(center);
+    // 모바일: 하단 카드에 마커가 가리지 않도록 살짝 위로 이동
+    if (isMobile()) setTimeout(() => map.panBy(0, 130), 340);
   }, isMobile() ? 320 : 0); // 패널 닫힘 애니메이션 후 relayout 반영
+}
+
+function hideDetail() {
+  const card = document.getElementById("detailCard");
+  if (card) card.hidden = true;
+}
+
+/* 상세 카드 닫기: X 버튼 / ESC / (모바일) 핸들 탭·아래로 스와이프 / 지도 클릭 */
+function bindDetailCard() {
+  document.getElementById("detailClose").onclick = clearSelection;
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !document.getElementById("detailCard").hidden) clearSelection();
+  });
+
+  const handle = document.getElementById("detailHandle");
+  let startY = null;
+  handle.addEventListener("touchstart", e => { startY = e.touches[0].clientY; }, { passive: true });
+  handle.addEventListener("touchend", e => {
+    if (startY == null) return;
+    if (e.changedTouches[0].clientY - startY > 24) clearSelection();
+    startY = null;
+  });
+  handle.addEventListener("click", clearSelection);
 }
 
 function drawCircle(center, color) {
@@ -550,7 +636,7 @@ function ourInfoHtml(store, nearbyFake) {
 
   return `
     <div class="info-window">
-      <div class="info-title">🏬 ${esc(store.name)}</div>
+      <div class="info-title"><span class="dot dot-blue"></span>${esc(store.name)}</div>
       <div class="info-row"><b>주소:</b> ${esc(store.address || "-")}</div>
       <div class="info-row"><b>${esc(store.salesMonth || "월")} 매출:</b> ${money(store.monthlySales)}</div>
       <div class="nearby-summary">반경 ${radiusKm}km 내 가품매장 ${nearbyFake.length}개</div>
@@ -566,7 +652,7 @@ function fakeInfoHtml(store, nearbyOur, impact) {
         <div>${esc(item.salesMonth || "월")} 매출: ${money(item.monthlySales)}</div>
         <div>주소: ${esc(item.address || "-")}</div>
       </div>`).join("")
-    : `<div class="empty-nearby">반경 ${radiusKm}km 내 우리매장이 없습니다.</div>`;
+    : `<div class="empty-nearby">반경 ${radiusKm}km 내 정품매장이 없습니다.</div>`;
 
   const impactClass = impact === "높음" ? "impact-high" : impact === "중간" ? "impact-mid" : "impact-low";
 
@@ -574,7 +660,7 @@ function fakeInfoHtml(store, nearbyOur, impact) {
 
   return `
     <div class="info-window">
-      <div class="info-title">🚩 ${esc(store.name || store.code || "가품매장")}</div>
+      <div class="info-title"><span class="dot ${isClosed(store) ? "dot-gray" : "dot-red"}"></span>${esc(store.name || store.code || "가품매장")}</div>
       <div class="info-row"><b>영업여부:</b> ${operatingBadge(store)}</div>
       ${row("매장코드", store.code)}
       ${row("주소", store.address)}
@@ -587,7 +673,7 @@ function fakeInfoHtml(store, nearbyOur, impact) {
       ${row("간판유형", store.signage)}
       ${row("비고", store.note)}
       <div class="nearby-summary">
-        반경 ${radiusKm}km 내 우리매장 ${nearbyOur.length}개<br/>
+        반경 ${radiusKm}km 내 정품매장 ${nearbyOur.length}개<br/>
         매출 영향도: <span class="${impactClass}">${impact}</span>
       </div>
       <div class="nearby-list">${list}</div>
@@ -635,7 +721,7 @@ function renderOurStoreList(stores) {
   const list = document.getElementById("ourStoreList");
   document.getElementById("ourListCount").textContent = stores.length;
   list.innerHTML = "";
-  if (!stores.length) { list.innerHTML = `<div class="store-meta">표시할 우리매장이 없습니다.</div>`; return; }
+  if (!stores.length) { list.innerHTML = `<div class="store-meta">표시할 정품매장이 없습니다.</div>`; return; }
 
   stores.forEach(store => {
     const nearby = getNearby(store, fakeStores);
@@ -667,7 +753,7 @@ function renderFakeStoreList(stores) {
       <div class="store-meta">
         ${operatingBadge(store)} ${store.type ? `<span class="badge badge-type">${esc(store.type)}</span>` : ""}<br/>
         ${store.product ? esc(store.product) + " · " : ""}${esc(store.area || store.address || "-")}<br/>
-        ${radiusKm}km 내 우리매장 <b>${nearby.length}</b>개
+        ${radiusKm}km 내 정품매장 <b>${nearby.length}</b>개
       </div>`;
     card.onclick = () => selectFakeStore(store);
     list.appendChild(card);
@@ -675,8 +761,22 @@ function renderFakeStoreList(stores) {
 }
 
 function updateMetrics() {
-  document.getElementById("fakeCount").textContent = fakeStores.length;
+  const open = fakeStores.filter(s => !isClosed(s));
+  document.getElementById("fakeOpenCount").textContent = open.length;
   document.getElementById("ourCount").textContent = ourStores.length;
+  document.getElementById("fakeTotal").textContent = `/ 누적 ${fakeStores.length}`;
+
+  // 운영중 매장의 유형별 구분 칩 + 종료 칩
+  const byType = new Map();
+  open.forEach(s => {
+    const t = (String(s.type || "").trim() || "기타").replace(/\s*매장$/, "");
+    byType.set(t, (byType.get(t) || 0) + 1);
+  });
+  const chips = [...byType.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, c]) => `<span class="mchip">${esc(t)} ${c}</span>`);
+  chips.push(`<span class="mchip muted">종료 ${fakeStores.length - open.length}</span>`);
+  document.getElementById("fakeBreakdown").innerHTML = chips.join("");
 }
 
 function fitAllMarkers() {
@@ -689,11 +789,268 @@ function fitAllMarkers() {
 }
 
 /* =====================================================================
+   8.5 현황 대시보드 (업로드된 가품매장 데이터로 실시간 계산)
+   ===================================================================== */
+const REGION_SHORT = [
+  ["서울특별시", "서울"], ["부산광역시", "부산"], ["대구광역시", "대구"], ["인천광역시", "인천"],
+  ["광주광역시", "광주"], ["대전광역시", "대전"], ["울산광역시", "울산"], ["세종특별자치시", "세종"],
+  ["경기도", "경기"], ["강원특별자치도", "강원"], ["강원도", "강원"],
+  ["충청북도", "충북"], ["충청남도", "충남"], ["전라북도", "전북"], ["전북특별자치도", "전북"],
+  ["전라남도", "전남"], ["경상북도", "경북"], ["경상남도", "경남"], ["제주특별자치도", "제주"], ["제주도", "제주"]
+];
+const REGION_NAMES = ["서울","부산","대구","인천","광주","대전","울산","세종","경기","강원","충북","충남","전북","전남","경북","경남","제주"];
+
+function storeRegion(s) {
+  const r = String(s.region || "").trim();
+  if (r) return r;
+  let addr = String(s.address || "").trim();
+  for (const [long, short] of REGION_SHORT) {
+    if (addr.startsWith(long)) return short;
+  }
+  const head = addr.slice(0, 2);
+  return REGION_NAMES.includes(head) ? head : "기타";
+}
+
+/* 인입월 키 "YYYY-MM" (인입월 → 인입일자 → 영업시작일 순으로 사용) */
+function storeMonth(s) {
+  const v = String(s.inflowMonth || s.inflowDate || s.openDate || "").trim();
+  return /^\d{4}-\d{2}/.test(v) ? v.slice(0, 7) : "";
+}
+
+/* 1차 조치 완료 = 1차 방문(채증) 일자가 기록된 매장 */
+function isFirstActionDone(s) {
+  const v = String(s.visitDate || "").trim();
+  return v !== "" && v !== "-";
+}
+
+function computeDashboard() {
+  const total = fakeStores.length;
+  const openCnt = fakeStores.filter(s => !isClosed(s)).length;
+  const closedCnt = total - openCnt;
+
+  const hasVisit = fakeStores.some(isFirstActionDone);
+  const doneCnt = fakeStores.filter(isFirstActionDone).length;
+
+  // 월별 신규 인입 (빈 달은 0으로 채워 시간축 왜곡 방지)
+  const byMonth = new Map();
+  fakeStores.forEach(s => {
+    const k = storeMonth(s);
+    if (k) byMonth.set(k, (byMonth.get(k) || 0) + 1);
+  });
+  const keys = [...byMonth.keys()].sort();
+  const months = [];
+  if (keys.length) {
+    let [y, m] = keys[0].split("-").map(Number);
+    const [ey, em] = keys[keys.length - 1].split("-").map(Number);
+    while (y < ey || (y === ey && m <= em)) {
+      const k = `${y}-${String(m).padStart(2, "0")}`;
+      months.push({ key: k, label: `${String(y).slice(2)}.${String(m).padStart(2, "0")}`, count: byMonth.get(k) || 0 });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+  }
+  let cum = 0;
+  months.forEach(mo => { cum += mo.count; mo.cum = cum; });
+
+  const nowKey = new Date().toISOString().slice(0, 7);
+  const newThisMonth = byMonth.get(nowKey) || 0;
+
+  // 권역별 (운영중/종료)
+  const byRegion = new Map();
+  fakeStores.forEach(s => {
+    const r = storeRegion(s);
+    if (!byRegion.has(r)) byRegion.set(r, { open: 0, closed: 0 });
+    byRegion.get(r)[isClosed(s) ? "closed" : "open"]++;
+  });
+  const regions = [...byRegion.entries()]
+    .map(([label, v]) => ({ label, ...v, total: v.open + v.closed }))
+    .sort((a, b) => b.total - a.total);
+
+  // 유형별 (운영중/종료)
+  const byType = new Map();
+  fakeStores.forEach(s => {
+    const t = String(s.type || "").trim() || "미분류";
+    if (!byType.has(t)) byType.set(t, { open: 0, closed: 0 });
+    byType.get(t)[isClosed(s) ? "closed" : "open"]++;
+  });
+  const types = [...byType.entries()]
+    .map(([label, v]) => ({ label, ...v, total: v.open + v.closed }))
+    .sort((a, b) => b.total - a.total);
+
+  return { total, openCnt, closedCnt, hasVisit, doneCnt, months, newThisMonth, regions, types };
+}
+
+function donutSvg(ratio, color, centerText) {
+  const r = 42, c = 2 * Math.PI * r;
+  const filled = Math.max(0, Math.min(1, ratio)) * c;
+  return `
+    <svg viewBox="0 0 110 110" role="img" aria-label="${Math.round(ratio * 100)}%">
+      <circle cx="55" cy="55" r="${r}" fill="none" stroke="#e5e5ea" stroke-width="12"/>
+      <circle cx="55" cy="55" r="${r}" fill="none" stroke="${color}" stroke-width="12"
+        stroke-linecap="round" stroke-dasharray="${filled} ${c}" transform="rotate(-90 55 55)"/>
+      <text x="55" y="61" text-anchor="middle" font-size="19" font-weight="800" fill="#1d1d1f">${centerText}</text>
+    </svg>`;
+}
+
+/* 월별 신규 인입(막대) + 누적(라인) — 축이 달라 위/아래 패널로 분리 */
+function monthlyChartSvg(months) {
+  if (!months.length) return `<div class="stats-empty">인입월 데이터가 없습니다.</div>`;
+  const W = 640, padL = 30, padR = 34;
+  const plotW = W - padL - padR;
+  const n = months.length;
+  const step = plotW / n;
+  const barW = Math.min(30, step * 0.55);
+  const maxCum = Math.max(...months.map(m => m.cum));
+  const maxCnt = Math.max(...months.map(m => m.count), 1);
+
+  // 상단: 누적 라인 (y 18~108) / 하단: 월별 막대 (y 138~226)
+  const cy = v => 108 - (v / maxCum) * 90;
+  const by = v => 226 - (v / maxCnt) * 88;
+  const cx = i => padL + step * i + step / 2;
+
+  const linePts = months.map((m, i) => `${cx(i).toFixed(1)},${cy(m.cum).toFixed(1)}`).join(" ");
+  const areaPts = `${padL + step / 2},108 ${linePts} ${cx(n - 1).toFixed(1)},108`;
+
+  const bars = months.map((m, i) => `
+    <rect x="${(cx(i) - barW / 2).toFixed(1)}" y="${by(m.count).toFixed(1)}" width="${barW.toFixed(1)}"
+      height="${(226 - by(m.count)).toFixed(1)}" rx="4" fill="#007AFF">
+      <title>${m.label} 신규 ${m.count}건</title>
+    </rect>
+    ${m.count ? `<text x="${cx(i).toFixed(1)}" y="${(by(m.count) - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="#48484a">${m.count}</text>` : ""}`).join("");
+
+  const last = months[n - 1];
+  const xLabels = months.map((m, i) => {
+    if (n > 8 && i % 2 === 1 && i !== n - 1) return "";
+    return `<text x="${cx(i).toFixed(1)}" y="242" text-anchor="middle" font-size="9.5" fill="#8e8e93">${m.label}</text>`;
+  }).join("");
+
+  return `
+    <svg viewBox="0 0 ${W} 250" role="img" aria-label="월별 인입 추이">
+      <text x="${padL}" y="12" font-size="10.5" font-weight="700" fill="#8e8e93">누적 인입</text>
+      <polygon points="${areaPts}" fill="rgba(0,122,255,0.08)"/>
+      <polyline points="${linePts}" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linejoin="round"/>
+      ${months.map((m, i) => `<circle cx="${cx(i).toFixed(1)}" cy="${cy(m.cum).toFixed(1)}" r="2.5" fill="#1d1d1f"><title>${m.label} 누적 ${m.cum}건</title></circle>`).join("")}
+      <text x="${(cx(n - 1) + 7).toFixed(1)}" y="${(cy(last.cum) + 4).toFixed(1)}" font-size="11" font-weight="800" fill="#1d1d1f">${last.cum}</text>
+      <line x1="${padL}" y1="108" x2="${W - padR}" y2="108" stroke="#e5e5ea"/>
+      <text x="${padL}" y="132" font-size="10.5" font-weight="700" fill="#8e8e93">월별 신규 인입</text>
+      ${bars}
+      <line x1="${padL}" y1="226" x2="${W - padR}" y2="226" stroke="#e5e5ea"/>
+      ${xLabels}
+    </svg>`;
+}
+
+function hbarListHtml(rows) {
+  if (!rows.length) return `<div class="stats-empty">데이터가 없습니다.</div>`;
+  const max = Math.max(...rows.map(r => r.total));
+  return `<div class="hbar-list">${rows.map(r => {
+    const segs = [
+      r.open ? `<div class="hbar-seg open" style="flex:${r.open}" title="${esc(r.label)} 운영중 ${r.open}개">${r.open / max > 0.05 ? r.open : ""}</div>` : "",
+      r.closed ? `<div class="hbar-seg closed" style="flex:${r.closed}" title="${esc(r.label)} 영업종료 ${r.closed}개">${r.closed / max > 0.05 ? r.closed : ""}</div>` : ""
+    ].join("");
+    return `
+      <div class="hbar-row">
+        <span class="hbar-label">${esc(r.label)}</span>
+        <div><div class="hbar-track" style="width:${(r.total / max * 100).toFixed(1)}%">${segs}</div></div>
+        <span class="hbar-total">${r.total}</span>
+      </div>`;
+  }).join("")}</div>`;
+}
+
+const OPEN_CLOSED_LEGEND = `
+  <div class="chart-legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:#FF3B30"></span>운영중</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#8e8e93"></span>영업종료</span>
+  </div>`;
+
+function renderDashboard() {
+  const body = document.getElementById("statsBody");
+  document.getElementById("statsDate").textContent = new Date().toISOString().slice(0, 10);
+
+  if (!fakeStores.length) {
+    body.innerHTML = `<div class="stats-empty">가품매장 데이터가 없습니다.<br/>관리자 메뉴에서 가품매장 파일을 업로드하세요.</div>`;
+    return;
+  }
+
+  const d = computeDashboard();
+  const doneRate = d.total ? d.doneCnt / d.total : 0;
+  const closeRate = d.total ? d.closedCnt / d.total : 0;
+
+  body.innerHTML = `
+    <p class="stats-section-title">I. 총괄 현황</p>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label"><span class="dot dot-blue"></span>인입 매장</div>
+        <div class="kpi-value">${d.total}<small>건</small></div>
+        <div class="kpi-hint">당월 신규 ${d.newThisMonth}건</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label"><span class="dot dot-green"></span>1차 조치 완료</div>
+        <div class="kpi-value">${d.hasVisit ? d.doneCnt + '<small>건</small>' : "-"}</div>
+        <div class="kpi-hint">${d.hasVisit ? `완료율 ${(doneRate * 100).toFixed(1)}%` : "방문일자 데이터 없음"}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label"><span class="dot dot-red"></span>운영중 매장</div>
+        <div class="kpi-value alert">${d.openCnt}<small>건</small></div>
+        <div class="kpi-hint">영업종료 ${d.closedCnt}건</div>
+      </div>
+    </div>
+
+    <p class="stats-section-title">II. 단계별 대응 추이</p>
+    <div class="chart-card">
+      <p class="chart-title">침해 매장 인입(적발) 현황</p>
+      ${monthlyChartSvg(d.months)}
+    </div>
+    <div class="chart-grid-2">
+      <div class="chart-card">
+        <p class="chart-title">1차 조치 완료율</p>
+        <div class="donut-row">
+          ${donutSvg(doneRate, "#007AFF", d.hasVisit ? (doneRate * 100).toFixed(1) + "%" : "-")}
+          <div class="donut-desc">${d.hasVisit
+            ? `완료 <b>${d.doneCnt}건</b> / ${d.total}건`
+            : "방문일자 데이터가 없습니다.<br/>DB 원본(.xlsm)을 업로드하면 표시됩니다."}</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <p class="chart-title">영업종료(종결)율</p>
+        <div class="donut-row">
+          ${donutSvg(closeRate, "#34c759", (closeRate * 100).toFixed(1) + "%")}
+          <div class="donut-desc">종료 <b>${d.closedCnt}건</b> / ${d.total}건<br/>현재 운영중 <b style="color:#FF3B30">${d.openCnt}건</b></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="stats-section-title">III. 매장 실태 분석</p>
+    <div class="chart-grid-2">
+      <div class="chart-card">
+        <p class="chart-title">권역별 침해 매장 현황</p>
+        ${OPEN_CLOSED_LEGEND}
+        ${hbarListHtml(d.regions)}
+      </div>
+      <div class="chart-card">
+        <p class="chart-title">임대 유형별 침해 매장 현황</p>
+        ${OPEN_CLOSED_LEGEND}
+        ${hbarListHtml(d.types)}
+      </div>
+    </div>`;
+}
+
+function openStats() {
+  if (isMobile()) closeMobilePanel();
+  clearSelection();
+  renderDashboard();
+  document.getElementById("statsOverlay").hidden = false;
+  document.body.classList.add("stats-open");
+}
+function closeStats() {
+  document.getElementById("statsOverlay").hidden = true;
+  document.body.classList.remove("stats-open");
+}
+
+/* =====================================================================
    9. 유틸
    ===================================================================== */
 function isClosed(store) {
   const v = String(store.operating || store.operatingStatus || "").trim();
-  return v === "종료" || v === "폐점" || v === "X" || v === "N" || v === "false";
+  return v.includes("종료") || v === "폐점" || v === "X" || v === "N" || v === "false";
 }
 function operatingLabel(store) { return isClosed(store) ? "종료" : "영업중"; }
 function operatingBadge(store) {
@@ -736,7 +1093,7 @@ const OUR_HEADER_MAP = {
 };
 
 const FAKE_HEADER_MAP = {
-  "매장코드": "code", "코드": "code", "code": "code",
+  "매장코드": "code", "코드": "code", "번호": "code", "code": "code",
   "매장명": "name", "매장이름": "name", "name": "name",
   "주소": "address", "가품매장주소": "address", "매장주소": "address", "address": "address",
   "판매상품": "product", "판매중인상품": "product", "상품": "product", "product": "product",
@@ -747,7 +1104,12 @@ const FAKE_HEADER_MAP = {
   "비고": "note", "메모": "note", "note": "note",
   "인테리어유형": "interior", "인테리어": "interior", "interior": "interior",
   "간판유형": "signage", "간판": "signage", "signage": "signage",
-  "현재영업여부": "operating", "영업여부": "operating", "영업상태": "operating", "operating": "operating",
+  "현재영업여부": "operating", "영업여부": "operating", "영업상태": "operating", "운영여부": "operating", "operating": "operating",
+  "인입월": "inflowMonth", "인입일자": "inflowDate",
+  "지역": "region",
+  "현재단계": "stage",
+  "방문일자": "visitDate",
+  "법적조치여부": "legalStatus",
   "위도": "lat", "lat": "lat", "경도": "lng", "lng": "lng",
   "id": "id"
 };
@@ -761,7 +1123,12 @@ function mapRow(row, headerMap) {
   Object.keys(row).forEach(rawKey => {
     const nk = normalizeKey(rawKey);
     const field = headerMap[nk] || headerMap[String(rawKey).trim()];
-    if (field) out[field] = row[rawKey];
+    if (!field) return;
+    const val = fmtCellDate(row[rawKey]);
+    // 이미 값이 있는 필드를 빈 값으로 덮어쓰지 않음
+    // (예: '법적조치여부(2차)'가 비어 있어도 1차 값 유지)
+    if (out[field] !== undefined && String(val).trim() === "") return;
+    out[field] = val;
   });
   // 숫자 변환
   if (out.lat !== undefined) out.lat = parseFloat(String(out.lat).replace(/[^0-9.\-]/g, "")) || undefined;
@@ -770,19 +1137,48 @@ function mapRow(row, headerMap) {
   return out;
 }
 
+/* 엑셀 날짜 셀(Date 객체) → "YYYY-MM-DD" 문자열.
+   SheetJS의 날짜 변환은 몇 초~몇 분 어긋나 전날 23:59로 나올 수 있어
+   12시간을 더해 가장 가까운 날짜로 반올림한다(값이 순수 날짜라는 전제). */
+function fmtCellDate(v) {
+  if (v instanceof Date && !isNaN(v)) {
+    const d = new Date(v.getTime() + 12 * 60 * 60 * 1000);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  }
+  return v;
+}
+
 function readSheet(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(e.target.result, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-        resolve(rows);
+        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
+        // '가품매장관리 DB' 원본(.xlsm)을 그대로 올려도 되도록 DB 시트 우선 사용
+        const sheetName = wb.SheetNames.includes("DB") ? "DB" : wb.SheetNames[0];
+        resolve(sheetToRows(wb.Sheets[sheetName]));
       } catch (err) { reject(err); }
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
+  });
+}
+
+/* 시트 → 행 객체 배열.
+   헤더가 첫 행이 아닌 경우(DB 시트는 3행에 헤더)에도 '매장명' 셀이 있는
+   행을 찾아 헤더로 사용하고, 그 아래 행들을 데이터로 읽는다. */
+function sheetToRows(ws) {
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  let headerIdx = grid.findIndex(row => row.some(c => String(c).trim() === "매장명"));
+  if (headerIdx < 0) headerIdx = 0;
+  const headers = (grid[headerIdx] || []).map(h => String(h).trim());
+  return grid.slice(headerIdx + 1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { if (h) obj[h] = row[i] ?? ""; });
+    return obj;
   });
 }
 
@@ -808,10 +1204,12 @@ async function handleUpload(file, kind) {
   clearSelection();
   renderMarkers();
   fitAllMarkers();
+  // 현황 대시보드가 열려 있으면 새 데이터로 갱신
+  if (!document.getElementById("statsOverlay").hidden) renderDashboard();
 
   const ok = mapped.filter(r => isValidCoordinate(r.lat, r.lng)).length;
   const fail = mapped.length - ok;
-  setStatus(`✅ ${kind === "our" ? "우리매장" : "가품매장"} ${mapped.length}건 반영 (좌표 성공 ${ok}, 실패 ${fail})`);
+  setStatus(`✅ ${kind === "our" ? "정품매장" : "가품매장"} ${mapped.length}건 반영 (좌표 성공 ${ok}, 실패 ${fail})`);
   hideGeoProgress();
 }
 
@@ -829,14 +1227,38 @@ function geocodeAddress(address) {
   });
 }
 
+/* 주소별 좌표 캐시: 재업로드 시 이미 변환한 주소는 지오코딩을 건너뜀 */
+const GEO_CACHE_KEY = "fakeStoreGeoCache_v1";
+function loadGeoCache() {
+  try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY)) || {}; } catch { return {}; }
+}
+function saveGeoCache(cache) {
+  try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache)); } catch (e) { console.warn("좌표 캐시 저장 실패", e); }
+}
+
 async function geocodeAll(items) {
+  const cache = loadGeoCache();
+  const misses = items.filter(it => {
+    const hit = cache[String(it.address).trim()];
+    if (hit && isValidCoordinate(hit.lat, hit.lng)) {
+      it.lat = hit.lat; it.lng = hit.lng;
+      return false;
+    }
+    return true;
+  });
+  if (!misses.length) return;
+
   showGeoProgress();
-  for (let i = 0; i < items.length; i++) {
-    updateGeoProgress(i + 1, items.length);
-    const coord = await geocodeAddress(items[i].address);
-    if (coord) { items[i].lat = coord.lat; items[i].lng = coord.lng; }
+  for (let i = 0; i < misses.length; i++) {
+    updateGeoProgress(i + 1, misses.length);
+    const coord = await geocodeAddress(misses[i].address);
+    if (coord) {
+      misses[i].lat = coord.lat; misses[i].lng = coord.lng;
+      cache[String(misses[i].address).trim()] = coord;
+    }
     await sleep(120); // API 부하 방지
   }
+  saveGeoCache(cache);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -858,7 +1280,7 @@ function downloadTemplate() {
     }
   ]);
 
-  XLSX.utils.book_append_sheet(wb, ourSheet, "우리매장");
+  XLSX.utils.book_append_sheet(wb, ourSheet, "정품매장");
   XLSX.utils.book_append_sheet(wb, fakeSheet, "가품매장");
   XLSX.writeFile(wb, "매장데이터_양식.xlsx");
 }
@@ -934,7 +1356,12 @@ function bindDataPanel() {
 function applyAdminState() {
   document.getElementById("adminLogin").hidden = isAdmin;
   document.getElementById("adminTools").hidden = !isAdmin;
-  document.getElementById("adminLock").textContent = isAdmin ? "🔓" : "🔒";
+  // 자물쇠 아이콘: 로그인 시 열림
+  const shackle = isAdmin ? 'M8 11V8a4 4 0 0 1 7.9-.9' : 'M8 11V8a4 4 0 0 1 8 0v3';
+  document.getElementById("adminLock").innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="${shackle}"/>
+    </svg>`;
 }
 
 function isMobile() {
@@ -1015,6 +1442,7 @@ async function main() {
     bindControls();
     bindDataPanel();
     bindMobileSidebar();
+    bindDetailCard();
     renderMarkers();
     fitAllMarkers();
   } catch (err) {

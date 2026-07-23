@@ -1,10 +1,12 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#ffffff" />
-  <title>가품매장 관제 지도</title>
+  <title>가품 매장 침해대응 지도</title>
+  <link rel="icon" type="image/png" href="img/favicon.png" />
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -13,22 +15,37 @@
   <div class="app">
     <!-- ===================== ① 좌측 아이콘 레일 (네이버 스타일) ===================== -->
     <nav class="rail" aria-label="주요 메뉴">
-      <div class="rail-logo" title="가품매장 관제 지도">FS</div>
+      <div class="rail-logo" title="가품 매장 침해대응 지도">
+        <img src="img/logo.webp" alt="MARITHÉ + FRANÇOIS GIRBAUD" />
+      </div>
       <button type="button" class="rail-item active" data-view="map">
-        <span class="rail-ico">🗺️</span><span class="rail-label">지도</span>
+        <span class="rail-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/>
+          </svg>
+        </span><span class="rail-label">지도</span>
       </button>
-      <button type="button" class="rail-item" data-view="our">
-        <span class="rail-ico">🏬</span><span class="rail-label">우리매장</span>
-      </button>
-      <button type="button" class="rail-item" data-view="fake">
-        <span class="rail-ico">🚩</span><span class="rail-label">가품매장</span>
+      <button type="button" class="rail-item" data-view="list">
+        <span class="rail-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>
+          </svg>
+        </span><span class="rail-label">목록</span>
       </button>
       <button type="button" class="rail-item" data-view="stats">
-        <span class="rail-ico">📊</span><span class="rail-label">현황</span>
+        <span class="rail-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <path d="M5 20v-7M12 20V5M19 20v-10"/>
+          </svg>
+        </span><span class="rail-label">현황</span>
       </button>
       <div class="rail-bottom">
         <button type="button" class="rail-item" id="railAdmin">
-          <span class="rail-ico">🔒</span><span class="rail-label">관리자</span>
+          <span class="rail-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+            </svg>
+          </span><span class="rail-label">관리자</span>
         </button>
       </div>
     </nav>
@@ -39,7 +56,11 @@
       <button type="button" class="sheet-handle" id="sheetHandle" aria-label="목록 크기 조절"></button>
       <header class="panel-head">
         <div class="search-box">
-          <span class="search-ico" aria-hidden="true">🔍</span>
+          <span class="search-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>
+            </svg>
+          </span>
           <input type="search" id="searchInput" placeholder="매장명·주소·상품·상권 검색" />
           <button type="button" id="searchClear" class="search-clear" aria-label="검색어 지우기" hidden>✕</button>
         </div>
@@ -47,15 +68,15 @@
       </header>
 
       <!-- 지표 요약 -->
-      <div class="metric-row">
-        <div class="metric">
-          <span class="metric-num" id="fakeCount">-</span>
-          <span class="metric-lbl">가품매장</span>
+      <div class="metric-cards">
+        <div class="metric-card">
+          <span class="metric-label"><span class="dot dot-red"></span>운영중 가품매장</span>
+          <div class="metric-value"><b class="alert" id="fakeOpenCount">-</b><span class="metric-total" id="fakeTotal"></span></div>
+          <div class="metric-chips" id="fakeBreakdown"></div>
         </div>
-        <div class="metric-divider"></div>
-        <div class="metric">
-          <span class="metric-num" id="ourCount">-</span>
-          <span class="metric-lbl">우리매장</span>
+        <div class="metric-card">
+          <span class="metric-label"><span class="dot dot-blue"></span>정품매장</span>
+          <div class="metric-value"><b id="ourCount">-</b></div>
         </div>
       </div>
 
@@ -65,18 +86,18 @@
           <label for="radiusRange">검색 반경 <b id="radiusLabel">5</b>km</label>
           <input type="range" id="radiusRange" min="1" max="20" step="1" value="5" />
         </div>
+        <p class="filter-title"><span class="dot dot-red"></span>가품매장 필터 <span class="filter-note">(정품매장은 검색만 적용)</span></p>
         <div class="filter-grid">
           <select id="typeFilter" aria-label="유형"><option value="ALL">유형 전체</option></select>
           <select id="operatingFilter" aria-label="영업여부"><option value="ALL">영업여부 전체</option></select>
           <select id="areaFilter" aria-label="상권"><option value="ALL">상권 전체</option></select>
-          <select id="productFilter" aria-label="판매상품"><option value="ALL">판매상품 전체</option></select>
         </div>
         <button type="button" id="resetBtn" class="reset-btn">전체 보기 · 필터 초기화</button>
       </div>
 
       <!-- 목록 (탭) -->
       <div class="list-tabs">
-        <button type="button" class="list-tab active" data-list="our">우리매장 <span class="tab-chip" id="ourListCount">0</span></button>
+        <button type="button" class="list-tab active" data-list="our">정품매장 <span class="tab-chip" id="ourListCount">0</span></button>
         <button type="button" class="list-tab" data-list="fake">가품매장 <span class="tab-chip" id="fakeListCount">0</span></button>
       </div>
 
@@ -109,14 +130,55 @@
           <button type="button" class="ctrl-btn zoom" id="zoomIn" aria-label="확대">+</button>
           <button type="button" class="ctrl-btn zoom" id="zoomOut" aria-label="축소">−</button>
         </div>
-        <button type="button" class="ctrl-btn round" id="locBtn" aria-label="내 위치">◎</button>
+        <button type="button" class="ctrl-btn round" id="locBtn" aria-label="내 위치">
+          <svg class="loc-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="6.5"/>
+            <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+            <path d="M12 1.5v3.5M12 19v3.5M1.5 12H5M19 12h3.5"/>
+          </svg>
+          <span class="loc-text">내 위치</span>
+        </button>
       </div>
 
+      <!-- 필터로 마커가 숨겨져 있음을 알리는 배지 -->
+      <button type="button" id="filterPill" class="filter-pill" hidden></button>
+
       <!-- 하단 중앙: 현 지도에서 검색 -->
-      <button type="button" id="searchHere" class="search-here">🔄 이 지역 다시 검색</button>
+      <button type="button" id="searchHere" class="search-here">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 11a8 8 0 1 0-2.5 5.5"/><path d="M20 5v6h-6"/>
+        </svg>
+        이 지역 다시 검색
+      </button>
 
       <!-- 모바일 패널 토글 -->
-      <button type="button" id="mobileSidebarToggle" class="mobile-toggle" aria-label="목록 열기">☰ 목록 · 검색</button>
+      <button type="button" id="mobileSidebarToggle" class="mobile-toggle" aria-label="목록 열기">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h10"/>
+        </svg>
+        목록 · 검색
+      </button>
+
+      <!-- 현황 대시보드 (업로드 데이터로 실시간 계산) -->
+      <section class="stats-overlay" id="statsOverlay" hidden>
+        <div class="stats-inner">
+          <header class="stats-head">
+            <div>
+              <h2 class="stats-title">MFG IP 침해 대응 현황 <span class="stats-sub">오프라인</span></h2>
+              <p class="stats-date">기준일 <b id="statsDate">-</b> · 업로드된 가품매장 데이터로 자동 계산</p>
+            </div>
+            <button type="button" id="statsClose" class="modal-close" aria-label="현황 닫기">✕</button>
+          </header>
+          <div class="stats-body" id="statsBody"></div>
+        </div>
+      </section>
+
+      <!-- 매장 상세 카드 (지도 인포윈도우 대체: 화면 고정, 내부 스크롤) -->
+      <aside class="detail-card" id="detailCard" hidden>
+        <button type="button" class="detail-handle" id="detailHandle" aria-label="상세 정보 닫기"></button>
+        <button type="button" class="detail-close" id="detailClose" aria-label="닫기">✕</button>
+        <div class="detail-body" id="detailBody"></div>
+      </aside>
     </main>
   </div>
 
@@ -124,7 +186,7 @@
   <div class="modal-backdrop" id="adminModal" hidden>
     <div class="modal">
       <div class="modal-head">
-        <span class="modal-title"><span id="adminLock">🔒</span> 관리자 데이터 관리</span>
+        <span class="modal-title"><span id="adminLock"></span>관리자 데이터 관리</span>
         <button type="button" id="adminClose" class="modal-close" aria-label="닫기">✕</button>
       </div>
 
@@ -142,18 +204,18 @@
         <!-- 해제: 도구 -->
         <div id="adminTools" hidden>
           <div class="admin-bar">
-            <span class="admin-badge">👤 관리자 모드</span>
+            <span class="admin-badge">관리자 모드</span>
             <button type="button" id="adminLogoutBtn" class="text-btn">로그아웃</button>
           </div>
-          <p class="hint">엑셀(.xlsx) 또는 CSV 파일을 올리면 지도가 자동 업데이트됩니다. 위경도가 없으면 주소로 자동 변환합니다.</p>
+          <p class="hint">엑셀(.xlsx/.xlsm) 또는 CSV 파일을 올리면 지도가 자동 업데이트됩니다. 가품매장은 <b>가품매장관리 DB 원본(.xlsm)을 그대로</b> 올려도 됩니다(DB 시트 자동 인식). 위경도가 없으면 주소로 자동 변환합니다.</p>
 
           <label class="upload-label" for="ourFile">
-            🏬 우리(정품) 매장 파일
-            <input type="file" id="ourFile" accept=".xlsx,.xls,.csv" />
+            <span class="dot dot-blue"></span>정품매장 파일
+            <input type="file" id="ourFile" accept=".xlsx,.xls,.xlsm,.csv" />
           </label>
           <label class="upload-label" for="fakeFile">
-            🚩 가품 매장 파일
-            <input type="file" id="fakeFile" accept=".xlsx,.xls,.csv" />
+            <span class="dot dot-red"></span>가품 매장 파일
+            <input type="file" id="fakeFile" accept=".xlsx,.xls,.xlsm,.csv" />
           </label>
 
           <div class="data-actions">
