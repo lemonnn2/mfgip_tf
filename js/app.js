@@ -63,28 +63,27 @@ function loadKakaoSdk() {
    ===================================================================== */
 async function loadData() {
   const saved = loadFromStorage();
-  if (saved) {
-    fakeStores = saved.fakeStores || [];
-    ourStores = saved.ourStores || [];
-    return;
-  }
+  let base = null;
   try {
     const res = await fetch(DATA_FILE, { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      fakeStores = data.fakeStores || [];
-      ourStores = data.ourStores || [];
-    }
+    if (res.ok) base = await res.json();
   } catch (e) {
-    console.warn("기본 데이터 로드 실패, 빈 데이터로 시작합니다.", e);
-    fakeStores = [];
-    ourStores = [];
+    console.warn("기본 데이터(map-data.json) 로드 실패", e);
   }
+
+  // 브라우저 저장본과 저장소 파일 중 더 최신 데이터 사용
+  // (내려받은 map-data.json을 저장소에 덮어쓰면 exportedAt이 갱신됨)
+  const savedAt = saved && saved.savedAt ? saved.savedAt : 0;
+  const baseAt = base && base.exportedAt ? base.exportedAt : 0;
+  const use = saved && savedAt >= baseAt ? saved : base;
+
+  fakeStores = (use && use.fakeStores) || [];
+  ourStores = (use && use.ourStores) || [];
 }
 
 function saveToStorage() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ fakeStores, ourStores }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ fakeStores, ourStores, savedAt: Date.now() }));
   } catch (e) { console.warn("저장 실패", e); }
 }
 function loadFromStorage() {
@@ -1285,6 +1284,19 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "매장데이터_양식.xlsx");
 }
 
+/* 현재 데이터(좌표 포함)를 map-data.json 형식으로 내려받기.
+   GitHub 저장소의 map-data.json에 덮어쓰면 모든 사용자의 기본 데이터가 됨 */
+function exportMapData() {
+  const payload = JSON.stringify({ exportedAt: Date.now(), fakeStores, ourStores }, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "map-data.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus(`map-data.json 내려받음 (가품 ${fakeStores.length} · 정품 ${ourStores.length}건) — GitHub 저장소에 덮어쓰면 전체 공유됩니다.`);
+}
+
 /* =====================================================================
    12. UI 헬퍼
    ===================================================================== */
@@ -1345,6 +1357,7 @@ function bindDataPanel() {
     if (e.target.files[0]) handleUpload(e.target.files[0], "fake").catch(err => setStatus(err.message, true));
   };
   document.getElementById("downloadTemplateBtn").onclick = downloadTemplate;
+  document.getElementById("exportDataBtn").onclick = exportMapData;
   document.getElementById("clearDataBtn").onclick = () => {
     if (!confirm("업로드한 데이터를 지우고 기본 데이터로 되돌립니다. 진행할까요?")) return;
     localStorage.removeItem(STORAGE_KEY);
