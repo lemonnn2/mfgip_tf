@@ -223,7 +223,26 @@
             <button type="button" id="clearDataBtn" class="mini-btn danger">데이터 초기화</button>
           </div>
           <button type="button" id="exportDataBtn" class="mini-btn">지도 데이터(map-data.json) 내려받기</button>
-          <p class="hint">내려받은 <b>map-data.json</b>을 GitHub 저장소의 같은 파일에 덮어쓰면, 업로드 없이도 모든 사용자에게 이 데이터가 기본으로 표시됩니다 (좌표 포함).</p>
+
+          <!-- GitHub 저장소 자동 반영 -->
+          <details class="gh-box" id="ghBox">
+            <summary>GitHub 저장소에 자동 반영 <span class="gh-state" id="ghState">미설정</span></summary>
+            <p class="hint">설정해두면 파일 업로드 직후 저장소의 <b>map-data.json</b>이 자동으로 갱신되어, 모든 기기·모든 사용자에게 같은 데이터가 표시됩니다.</p>
+            <div class="gh-grid">
+              <input type="text" id="ghOwner" placeholder="GitHub 아이디 (예: lemonnn2)" autocomplete="off" />
+              <input type="text" id="ghRepo" placeholder="저장소 이름 (예: mfgip_tf)" autocomplete="off" />
+              <input type="text" id="ghBranch" placeholder="브랜치 (기본 main)" autocomplete="off" />
+              <input type="password" id="ghToken" placeholder="액세스 토큰 (ghp_...)" autocomplete="off" />
+            </div>
+            <label class="gh-check"><input type="checkbox" id="ghAuto" /> 업로드하면 자동으로 저장소에 반영</label>
+            <div class="data-actions">
+              <button type="button" id="ghSaveBtn" class="mini-btn">설정 저장</button>
+              <button type="button" id="ghPushBtn" class="mini-btn">지금 반영하기</button>
+              <button type="button" id="ghClearBtn" class="mini-btn danger">설정 삭제</button>
+            </div>
+            <p class="hint">토큰은 <b>이 브라우저에만</b> 저장되며 저장소 코드에는 포함되지 않습니다. GitHub → Settings → Developer settings → <b>Fine-grained tokens</b>에서 <b>이 저장소만</b> 선택하고 <b>Contents: Read and write</b> 권한으로 발급하세요. 공용 PC에서는 사용 후 <b>설정 삭제</b>를 눌러주세요.</p>
+          </details>
+
           <p class="hint" id="dataStatus"></p>
           <div class="geo-progress" id="geoProgress" hidden></div>
         </div>

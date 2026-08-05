@@ -529,6 +529,37 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
   background: #eaf3ff; border-radius: 10px; padding: 10px; text-align: center;
 }
 
+/* GitHub 저장소 자동 반영 */
+.gh-box {
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; background: #fafafa;
+}
+.gh-box summary {
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.gh-box summary::-webkit-details-marker { display: none; }
+.gh-box summary::before { content: "▸"; color: var(--gray-text); font-size: 11px; }
+.gh-box[open] summary::before { content: "▾"; }
+.gh-box > *:not(summary) { margin-top: 10px; }
+.gh-state {
+  margin-left: auto; font-size: 11px; font-weight: 700;
+  color: var(--gray-text); background: #e5e5ea;
+  border-radius: 999px; padding: 2px 9px;
+}
+.gh-state.on { color: #248a3d; background: #e5f8ea; }
+.gh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gh-grid input {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 10px; font-size: 13px; font-family: inherit;
+}
+.gh-grid input:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-color: var(--blue); }
+.gh-check {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 600; color: #1d1d1f; cursor: pointer;
+}
+.gh-check input { accent-color: var(--blue); width: 16px; height: 16px; }
+
 /* ===================== 태블릿 ===================== */
 @media (max-width: 1024px) and (min-width: 901px) {
   .panel { width: 320px; }

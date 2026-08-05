@@ -1210,6 +1210,10 @@ async function handleUpload(file, kind) {
   const fail = mapped.length - ok;
   setStatus(`✅ ${kind === "our" ? "정품매장" : "가품매장"} ${mapped.length}건 반영 (좌표 성공 ${ok}, 실패 ${fail})`);
   hideGeoProgress();
+
+  // 자동 반영이 켜져 있으면 저장소의 map-data.json까지 갱신
+  const gh = loadGhConfig();
+  if (gh.auto && gh.owner && gh.repo && gh.token) await pushToGithub();
 }
 
 /* 카카오 지오코더 (주소 → 좌표), 초당 과요청 방지용 딜레이 */
@@ -1284,10 +1288,15 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "매장데이터_양식.xlsx");
 }
 
+/* 저장소에 올릴 map-data.json 본문 */
+function mapDataJson() {
+  return JSON.stringify({ exportedAt: Date.now(), fakeStores, ourStores }, null, 2);
+}
+
 /* 현재 데이터(좌표 포함)를 map-data.json 형식으로 내려받기.
    GitHub 저장소의 map-data.json에 덮어쓰면 모든 사용자의 기본 데이터가 됨 */
 function exportMapData() {
-  const payload = JSON.stringify({ exportedAt: Date.now(), fakeStores, ourStores }, null, 2);
+  const payload = mapDataJson();
   const blob = new Blob([payload], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -1295,6 +1304,122 @@ function exportMapData() {
   a.click();
   URL.revokeObjectURL(a.href);
   setStatus(`map-data.json 내려받음 (가품 ${fakeStores.length} · 정품 ${ourStores.length}건) — GitHub 저장소에 덮어쓰면 전체 공유됩니다.`);
+}
+
+/* =====================================================================
+   11.5 GitHub 저장소 자동 반영
+   업로드한 데이터를 저장소의 map-data.json에 직접 커밋해서
+   모든 기기·모든 사용자가 같은 데이터를 보도록 만든다.
+   토큰은 이 브라우저(localStorage)에만 저장되고 저장소 코드에는 포함되지 않는다.
+   ===================================================================== */
+const GH_KEY = "fakeStoreGh_v1";
+
+function loadGhConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_KEY)) || {}; } catch { return {}; }
+}
+function saveGhConfig(cfg) {
+  try { localStorage.setItem(GH_KEY, JSON.stringify(cfg)); } catch (e) { console.warn("GitHub 설정 저장 실패", e); }
+}
+
+/* 한글이 포함된 UTF-8 문자열 → base64 (GitHub API가 요구하는 형식) */
+function toBase64Utf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  const CHUNK = 0x8000; // 큰 파일에서 스택 초과 방지
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function pushToGithub() {
+  const cfg = loadGhConfig();
+  if (!cfg.owner || !cfg.repo || !cfg.token) {
+    setStatus("GitHub 설정(아이디·저장소·토큰)을 먼저 입력하고 저장하세요.", true);
+    return false;
+  }
+  const branch = cfg.branch || "main";
+  const path = cfg.path || "map-data.json";
+  const api = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${path}`;
+  const headers = {
+    Authorization: `Bearer ${cfg.token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+
+  setStatus("GitHub 저장소에 반영 중...");
+  try {
+    // 기존 파일이 있으면 sha 필요 (없으면 새로 생성)
+    let sha;
+    const cur = await fetch(`${api}?ref=${encodeURIComponent(branch)}`, { headers, cache: "no-store" });
+    if (cur.ok) sha = (await cur.json()).sha;
+    else if (cur.status === 401) { setStatus("토큰이 유효하지 않습니다. 다시 발급해 주세요.", true); return false; }
+    else if (cur.status !== 404) { setStatus(`저장소를 찾을 수 없습니다 (${cur.status}). 아이디·저장소·브랜치를 확인하세요.`, true); return false; }
+
+    const body = {
+      message: `데이터 갱신: 가품 ${fakeStores.length} · 정품 ${ourStores.length}건`,
+      content: toBase64Utf8(mapDataJson()),
+      branch
+    };
+    if (sha) body.sha = sha;
+
+    const res = await fetch(api, { method: "PUT", headers, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const msg = await res.text();
+      const hint = res.status === 403 ? " (토큰 권한에 Contents: Read and write 가 필요합니다)" : "";
+      setStatus(`반영 실패 (${res.status})${hint}: ${msg.slice(0, 120)}`, true);
+      return false;
+    }
+    setStatus(`✅ 저장소에 반영 완료 (가품 ${fakeStores.length} · 정품 ${ourStores.length}건). 1~2분 후 사이트에 적용됩니다.`);
+    return true;
+  } catch (e) {
+    setStatus("반영 실패: " + e.message, true);
+    return false;
+  }
+}
+
+function bindGithubPanel() {
+  const cfg = loadGhConfig();
+  const el = id => document.getElementById(id);
+  // 브라우저가 이전 버전 HTML을 캐시한 경우 요소가 없을 수 있음 → 앱 전체가 멈추지 않도록 건너뜀
+  if (!el("ghOwner")) { console.warn("GitHub 패널 요소 없음(캐시된 구버전 HTML). 새로고침하세요."); return; }
+  el("ghOwner").value = cfg.owner || "";
+  el("ghRepo").value = cfg.repo || "";
+  el("ghBranch").value = cfg.branch || "";
+  el("ghToken").value = cfg.token || "";
+  el("ghAuto").checked = !!cfg.auto;
+  updateGhState();
+
+  el("ghSaveBtn").onclick = () => {
+    saveGhConfig({
+      owner: el("ghOwner").value.trim(),
+      repo: el("ghRepo").value.trim(),
+      branch: el("ghBranch").value.trim() || "main",
+      path: "map-data.json",
+      token: el("ghToken").value.trim(),
+      auto: el("ghAuto").checked
+    });
+    updateGhState();
+    setStatus("GitHub 설정을 저장했습니다.");
+  };
+  el("ghPushBtn").onclick = () => pushToGithub();
+  el("ghClearBtn").onclick = () => {
+    if (!confirm("저장된 GitHub 설정과 토큰을 삭제할까요?")) return;
+    localStorage.removeItem(GH_KEY);
+    ["ghOwner", "ghRepo", "ghBranch", "ghToken"].forEach(i => (el(i).value = ""));
+    el("ghAuto").checked = false;
+    updateGhState();
+    setStatus("GitHub 설정을 삭제했습니다.");
+  };
+}
+
+function updateGhState() {
+  const cfg = loadGhConfig();
+  const on = !!(cfg.owner && cfg.repo && cfg.token);
+  const badge = document.getElementById("ghState");
+  if (!badge) return;
+  badge.textContent = on ? (cfg.auto ? "자동 반영 켜짐" : "설정됨") : "미설정";
+  badge.classList.toggle("on", on);
 }
 
 /* =====================================================================
@@ -1358,6 +1483,7 @@ function bindDataPanel() {
   };
   document.getElementById("downloadTemplateBtn").onclick = downloadTemplate;
   document.getElementById("exportDataBtn").onclick = exportMapData;
+  bindGithubPanel();
   document.getElementById("clearDataBtn").onclick = () => {
     if (!confirm("업로드한 데이터를 지우고 기본 데이터로 되돌립니다. 진행할까요?")) return;
     localStorage.removeItem(STORAGE_KEY);
