@@ -490,6 +490,12 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
 /* 항목명이 긴 차트(유형별·조치별)는 라벨 열을 넓게 */
 .hbar-list.wide .hbar-row { grid-template-columns: 104px 1fr 34px; }
 .hbar-list.wide .hbar-track { height: 22px; }
+/* 구버전 데이터 안내 */
+.stats-notice {
+  margin: 0; padding: 11px 14px; border-radius: 12px;
+  background: #fff4e5; color: #a05a00; font-size: 12.5px; font-weight: 600;
+  border: 1px solid #ffe0b2;
+}
 .stats-empty {
   background: #fff; border-radius: 14px; padding: 28px; text-align: center;
   color: var(--gray-text); font-size: 13.5px; box-shadow: var(--shadow-sm);

@@ -860,6 +860,11 @@ const delivClosed = s => isDate(s.deliverDate) && isEq(s.deliverStatus, "영업�
 const closedAt2nd = s => isEq(s.op2, "영업종료") || isEq(s.status2, "완전폐업/영업종료");
 const isFirstActionDone = s => isDate(s.visitDate);
 
+/* 최고서 발송·2차 채증 계산에 필요한 DB 컬럼들 (하나라도 있으면 최신 형식의 데이터) */
+const STAGE_FIELDS = ["mailA", "mailB", "mailC", "mailD", "handDate", "deliverDate",
+                      "visit2Date", "comply2", "target1", "visitOperating"];
+const STAGE_DATA_HINT = "최고서·2차 조치 항목이 없는 데이터입니다. 관리자 메뉴에서 DB 원본(.xlsm)을 다시 올려주세요.";
+
 /* 인입월 키 "YYYY-MM" (인입월 → 인입일자 → 영업시작일 순으로 사용) */
 function storeMonth(s) {
   const v = dstr(s.inflowMonth || s.inflowDate || s.openDate);
@@ -877,6 +882,11 @@ function computeDashboard() {
   const total = S.length;                                   // B4
   const closedCnt = cnt(S, s => isClosed(s));
   const openCnt = total - closedCnt;
+
+  /* 최고서·2차 항목은 DB 시트의 발송/교부/2차 컬럼이 있어야 계산된다.
+     예전 버전으로 업로드해 둔 데이터에는 이 컬럼이 없어 전부 0이 되므로,
+     "값이 0"인 것과 "컬럼 자체가 없는 것"을 구분해 화면에 알린다. */
+  const hasStageData = S.some(s => STAGE_FIELDS.some(k => k in s));
 
   /* --- I-1. 1차 채증 --- */
   const visited = cnt(S, isFirstActionDone);                 // B5
@@ -968,7 +978,7 @@ function computeDashboard() {
     purchaseEvidence: ex.purchaseEvidence, sellerCount: ex.sellerCount,
     mailCount, handCount, noticeTargets, noticeStores, noticeRate,
     base2, judged, judgeRate, comply: complyTotal, nonComply, nonComplyLegal,
-    types, regions, capitalRate, buckets
+    types, regions, capitalRate, buckets, hasStageData
   };
 }
 
@@ -1118,6 +1128,7 @@ function renderDashboard() {
   const openClosed = [{ name: "운영중", color: C_OPEN }, { name: "영업종료", color: C_CLOSED }];
 
   body.innerHTML = `
+    ${d.hasStageData ? "" : `<p class="stats-notice">${STAGE_DATA_HINT}</p>`}
     <p class="stats-section-title">I. 총괄 현황</p>
     <div class="overview-grid">
       <div class="kpi-card total-card">
@@ -1145,24 +1156,28 @@ function renderDashboard() {
           foot: `${d.total}건 중 ${d.visited}건`
         })}
         ${stageCard({
-          title: "최고서 발송", ratio: d.noticeRate, color: C_PERIOD,
+          title: "최고서 발송", ratio: d.hasStageData ? d.noticeRate : null, color: C_PERIOD,
           items: [
-            { k: "우편 발송", note: "*발송 건수", v: d.mailCount },
-            { k: "배달 교부", note: "*사전 포함", v: d.handCount }
+            { k: "우편 발송", note: "*발송 건수", v: d.hasStageData ? d.mailCount : null },
+            { k: "배달 교부", note: "*사전 포함", v: d.hasStageData ? d.handCount : null }
           ],
-          foot: `발송 매장 수 ${d.noticeTargets}건 중 ${d.noticeStores}건`
+          foot: d.hasStageData
+            ? `발송 매장 수 ${d.noticeTargets}건 중 ${d.noticeStores}건`
+            : STAGE_DATA_HINT
         })}
       </section>
 
       <section class="stage-group">
         <p class="stage-head">2차 조치</p>
         ${stageCard({
-          title: "2차 채증", ratio: d.judgeRate, color: C_PERIOD,
+          title: "2차 채증", ratio: d.hasStageData ? d.judgeRate : null, color: C_PERIOD,
           items: [
-            { k: "최고 이행", note: "*종료 포함", v: d.comply },
-            { k: "최고 미이행", v: d.nonComply }
+            { k: "최고 이행", note: "*종료 포함", v: d.hasStageData ? d.comply : null },
+            { k: "최고 미이행", v: d.hasStageData ? d.nonComply : null }
           ],
-          foot: `${d.base2}건 중 ${d.judged}건 · 미이행 중 법적조치 ${d.nonComplyLegal}건 포함`
+          foot: d.hasStageData
+            ? `${d.base2}건 중 ${d.judged}건 · 미이행 중 법적조치 ${d.nonComplyLegal}건 포함`
+            : STAGE_DATA_HINT
         })}
       </section>
     </div>
