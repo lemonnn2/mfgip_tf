@@ -79,6 +79,7 @@ async function loadData() {
 
   fakeStores = (use && use.fakeStores) || [];
   ourStores = (use && use.ourStores) || [];
+  if (use && use.dashboardMeta) saveDashboardMeta(use.dashboardMeta);
 }
 
 function saveToStorage() {
@@ -91,6 +92,26 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
+}
+
+/* ---- 대시보드 보조 수치 ----
+   DB 시트만으로는 구할 수 없어 원본 통합문서의 보조 시트에서 읽어오는 값.
+   (구매 채증 = 제품DB · 사업자 특정 = 판매자 정보 · 우편 발송 = 최고발송list)
+   가품 DB 원본을 업로드할 때마다 자동으로 갱신된다. */
+const DASHBOARD_META_KEY = "fakeStoreDashboardMeta_v1";
+const DASHBOARD_META_DEFAULT = {
+  extra: { purchaseEvidence: 68, sellerCount: 41, noticeMailDates: [] }
+};
+
+function loadDashboardMeta() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(DASHBOARD_META_KEY)); } catch { saved = null; }
+  const base = JSON.parse(JSON.stringify(DASHBOARD_META_DEFAULT));
+  return saved ? { extra: Object.assign(base.extra, saved.extra || {}) } : base;
+}
+function saveDashboardMeta(meta) {
+  try { localStorage.setItem(DASHBOARD_META_KEY, JSON.stringify(meta)); }
+  catch (e) { console.warn("대시보드 설정 저장 실패", e); }
 }
 
 /* =====================================================================
@@ -788,86 +809,109 @@ function fitAllMarkers() {
 }
 
 /* =====================================================================
-   8.5 현황 대시보드 (업로드된 가품매장 데이터로 실시간 계산)
+   8.5 현황 대시보드
+   엑셀 '대시보드(작성중)' 시트를 그대로 옮긴 화면.
+   수치는 업로드된 DB 시트에서 '대시보드계산' 시트와 같은 규칙으로 실시간 계산하고,
+   DB에 없는 값(구매 채증·사업자 특정·최고발송list·사법조치·보고 구간)은
+   dashboardMeta에서 가져온다.
    ===================================================================== */
+
+/* 주소 → 권역 (DB '지역' 컬럼이 비었을 때만 사용. 대시보드계산 S:T 대응표와 동일) */
 const REGION_SHORT = [
-  ["서울특별시", "서울"], ["부산광역시", "부산"], ["대구광역시", "대구"], ["인천광역시", "인천"],
-  ["광주광역시", "광주"], ["대전광역시", "대전"], ["울산광역시", "울산"], ["세종특별자치시", "세종"],
-  ["경기도", "경기"], ["강원특별자치도", "강원"], ["강원도", "강원"],
-  ["충청북도", "충북"], ["충청남도", "충남"], ["전라북도", "전북"], ["전북특별자치도", "전북"],
-  ["전라남도", "전남"], ["경상북도", "경북"], ["경상남도", "경남"], ["제주특별자치도", "제주"], ["제주도", "제주"]
+  ["서울특별시", "서울"], ["서울시", "서울"], ["서울", "서울"],
+  ["인천광역시", "경기·인천"], ["인천", "경기·인천"], ["경기도", "경기·인천"], ["경기", "경기·인천"],
+  ["부산광역시", "경상"], ["부산", "경상"], ["대구광역시", "경상"], ["대구", "경상"],
+  ["울산광역시", "경상"], ["울산", "경상"], ["경상북도", "경상"], ["경북", "경상"],
+  ["경상남도", "경상"], ["경남", "경상"],
+  ["대전광역시", "충청"], ["대전", "충청"], ["세종특별자치시", "충청"], ["세종", "충청"],
+  ["충청북도", "충청"], ["충북", "충청"], ["충청남도", "충청"], ["충남", "충청"],
+  ["광주광역시", "전라"], ["광주", "전라"], ["전라북도", "전라"], ["전북특별자치도", "전라"],
+  ["전북", "전라"], ["전라남도", "전라"], ["전남", "전라"],
+  ["강원특별자치도", "강원"], ["강원도", "강원"], ["강원", "강원"],
+  ["제주특별자치도", "제주"], ["제주도", "제주"], ["제주", "제주"]
 ];
-const REGION_NAMES = ["서울","부산","대구","인천","광주","대전","울산","세종","경기","강원","충북","충남","전북","전남","경북","경남","제주"];
+const CAPITAL_REGIONS = ["서울", "경기·인천"];
 
 function storeRegion(s) {
   const r = String(s.region || "").trim();
   if (r) return r;
-  let addr = String(s.address || "").trim();
+  const addr = String(s.address || "").trim();
   for (const [long, short] of REGION_SHORT) {
     if (addr.startsWith(long)) return short;
   }
-  const head = addr.slice(0, 2);
-  return REGION_NAMES.includes(head) ? head : "기타";
+  return "기타";
 }
+
+/* ---- 셀 값 판정 도우미 (엑셀 ISNUMBER(날짜) / 문자열 비교와 동치) ---- */
+const dstr = v => String(v ?? "").trim();
+const isDate = v => /^\d{4}-\d{2}-\d{2}/.test(dstr(v));
+const isEq = (v, t) => dstr(v) === t;
+const startsW = (v, t) => dstr(v).startsWith(t);
+const cnt = (arr, fn) => arr.reduce((n, s) => n + (fn(s) ? 1 : 0), 0);
+
+/* 최고서가 나간 매장 (우편 ⓐⓑⓒⓓ · 직접전달 · 교부방문 중 하나라도) — 대시보드계산 B86 */
+const noticeSent = s =>
+  isDate(s.mailA) || isDate(s.mailB) || isDate(s.mailC) || isDate(s.mailD) ||
+  isDate(s.handDate) || isDate(s.deliverDate);
+/* 교부 시 영업종료가 확인된 매장 (2차 방문 없이 이행으로 간주) */
+const handClosed = s => isDate(s.handDate) && isEq(s.handStatus, "영업종료");
+const delivClosed = s => isDate(s.deliverDate) && isEq(s.deliverStatus, "영업종료");
+/* 2차 방문에서 영업종료가 확인된 매장 */
+const closedAt2nd = s => isEq(s.op2, "영업종료") || isEq(s.status2, "완전폐업/영업종료");
+const isFirstActionDone = s => isDate(s.visitDate);
 
 /* 인입월 키 "YYYY-MM" (인입월 → 인입일자 → 영업시작일 순으로 사용) */
 function storeMonth(s) {
-  const v = String(s.inflowMonth || s.inflowDate || s.openDate || "").trim();
+  const v = dstr(s.inflowMonth || s.inflowDate || s.openDate);
   return /^\d{4}-\d{2}/.test(v) ? v.slice(0, 7) : "";
 }
 
-/* 1차 조치 완료 = 1차 방문(채증) 일자가 기록된 매장 */
-function isFirstActionDone(s) {
-  const v = String(s.visitDate || "").trim();
-  return v !== "" && v !== "-";
-}
-
+/* ---------------------------------------------------------------------
+   대시보드 수치 계산 — 괄호 안은 '대시보드계산' 시트의 대응 셀
+   --------------------------------------------------------------------- */
 function computeDashboard() {
-  const total = fakeStores.length;
-  const openCnt = fakeStores.filter(s => !isClosed(s)).length;
-  const closedCnt = total - openCnt;
+  const S = fakeStores;
+  const meta = loadDashboardMeta();
+  const ex = meta.extra || {};
 
-  const hasVisit = fakeStores.some(isFirstActionDone);
-  const doneCnt = fakeStores.filter(isFirstActionDone).length;
+  const total = S.length;                                   // B4
+  const closedCnt = cnt(S, s => isClosed(s));
+  const openCnt = total - closedCnt;
 
-  // 월별 신규 인입 (빈 달은 0으로 채워 시간축 왜곡 방지)
-  const byMonth = new Map();
-  fakeStores.forEach(s => {
-    const k = storeMonth(s);
-    if (k) byMonth.set(k, (byMonth.get(k) || 0) + 1);
-  });
-  const keys = [...byMonth.keys()].sort();
-  const months = [];
-  if (keys.length) {
-    let [y, m] = keys[0].split("-").map(Number);
-    const [ey, em] = keys[keys.length - 1].split("-").map(Number);
-    while (y < ey || (y === ey && m <= em)) {
-      const k = `${y}-${String(m).padStart(2, "0")}`;
-      months.push({ key: k, label: `${String(y).slice(2)}.${String(m).padStart(2, "0")}`, count: byMonth.get(k) || 0 });
-      m++; if (m > 12) { m = 1; y++; }
-    }
-  }
-  let cum = 0;
-  months.forEach(mo => { cum += mo.count; mo.cum = cum; });
+  /* --- I-1. 1차 채증 --- */
+  const visited = cnt(S, isFirstActionDone);                 // B5
+  const visitRate = total ? visited / total : 0;             // C5
 
-  const nowKey = new Date().toISOString().slice(0, 7);
-  const newThisMonth = byMonth.get(nowKey) || 0;
+  /* --- I-2. 최고서 발송 --- */
+  const noticeTargets = cnt(S, s => isEq(s.target1, "조치대상") || noticeSent(s)); // B84
+  const noticeStores = cnt(S, noticeSent);                                          // B86
+  const noticeRate = noticeTargets ? noticeStores / noticeTargets : 0;              // B85
+  // 우편 발송 건수 = DB ⓐⓑⓒ + 최고발송list (AE67)
+  const mailFromList = (ex.noticeMailDates || []).length;
+  const mailCount = cnt(S, s => isDate(s.mailA)) + cnt(S, s => isDate(s.mailB)) +
+                    cnt(S, s => isDate(s.mailC)) + mailFromList;
+  // 배달(직접) 교부 시도 횟수 (B113 = B108+B109+B110+B111)
+  const handCount = cnt(S, s => isDate(s.deliverDate)) + cnt(S, s => isDate(s.handDate));
 
-  // 권역별 (운영중/종료)
-  const byRegion = new Map();
-  fakeStores.forEach(s => {
-    const r = storeRegion(s);
-    if (!byRegion.has(r)) byRegion.set(r, { open: 0, closed: 0 });
-    byRegion.get(r)[isClosed(s) ? "closed" : "open"]++;
-  });
-  const regions = [...byRegion.entries()]
-    .map(([label, v]) => ({ label, ...v, total: v.open + v.closed }))
-    .sort((a, b) => b.total - a.total);
+  /* --- I-3. 2차 채증 / 최고 이행 판정 (모수 = 최고서 발송 매장) --- */
+  const base2 = noticeStores;                                                        // B129
+  const visited2 = s => isDate(s.visit2Date);
+  const comply       = cnt(S, s => noticeSent(s) && visited2(s) && !closedAt2nd(s) && startsW(s.comply2, "이행완료")); // B136
+  const closed2nd    = cnt(S, s => noticeSent(s) && visited2(s) && closedAt2nd(s));                                    // B137
+  const closedByHand = cnt(S, s => noticeSent(s) && !visited2(s) && (handClosed(s) || delivClosed(s)));                 // B131=B138
+  const closed1st    = cnt(S, s => noticeSent(s) && !visited2(s) && !(handClosed(s) || delivClosed(s)) &&
+                                   isEq(s.visitOperating, "영업종료"));                                                 // B139
+  const complyTotal = comply + closed2nd + closedByHand + closed1st;                                                    // B140
+  const nonComply   = cnt(S, s => noticeSent(s) && visited2(s) && !closedAt2nd(s) && startsW(s.comply2, "미이행"));      // B141
+  const judged = complyTotal + nonComply;                                                                               // B149
+  const judgeRate = base2 ? judged / base2 : 0;                                                                         // B152
+  const nonComplyLegal = cnt(S, s => noticeSent(s) && visited2(s) && !closedAt2nd(s) &&
+                                     startsW(s.comply2, "미이행") && isEq(s.legalStatus, "법적조치 진행중"));            // B164
 
-  // 유형별 (운영중/종료)
+  /* --- II-1. 매장 유형별 운영 현황 (차트15) --- */
   const byType = new Map();
-  fakeStores.forEach(s => {
-    const t = String(s.type || "").trim() || "미분류";
+  S.forEach(s => {
+    const t = dstr(s.type) || "(유형 미기입)";
     if (!byType.has(t)) byType.set(t, { open: 0, closed: 0 });
     byType.get(t)[isClosed(s) ? "closed" : "open"]++;
   });
@@ -875,90 +919,190 @@ function computeDashboard() {
     .map(([label, v]) => ({ label, ...v, total: v.open + v.closed }))
     .sort((a, b) => b.total - a.total);
 
-  return { total, openCnt, closedCnt, hasVisit, doneCnt, months, newThisMonth, regions, types };
+  /* --- II-2. 권역별 매장 현황 (차트17) --- */
+  const byRegion = new Map();
+  S.forEach(s => {
+    const r = storeRegion(s);
+    if (!byRegion.has(r)) byRegion.set(r, { open: 0, closed: 0 });
+    byRegion.get(r)[isClosed(s) ? "closed" : "open"]++;
+  });
+  const regions = [...byRegion.entries()]
+    .map(([label, v]) => ({ label, ...v, total: v.open + v.closed }))
+    .sort((a, b) => b.total - a.total);
+  const capitalCnt = regions.filter(r => CAPITAL_REGIONS.includes(r.label))
+    .reduce((n, r) => n + r.total, 0);
+  const capitalRate = total ? capitalCnt / total : 0;        // 작성중 R40
+
+  /* --- II-3. 월별 인입 추이 (차트16) — 작년 이전은 연 단위로 묶음 --- */
+  const byMonth = new Map();
+  S.forEach(s => { const k = storeMonth(s); if (k) byMonth.set(k, (byMonth.get(k) || 0) + 1); });
+  const keys = [...byMonth.keys()].sort();
+  const months = [];
+  if (keys.length) {
+    let [y, m] = keys[0].split("-").map(Number);
+    const [ey, em] = keys[keys.length - 1].split("-").map(Number);
+    while (y < ey || (y === ey && m <= em)) {
+      months.push({ year: y, key: `${y}-${String(m).padStart(2, "0")}`, count: 0 });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    months.forEach(mo => { mo.count = byMonth.get(mo.key) || 0; });
+  }
+  const lastYear = months.length ? months[months.length - 1].year : 0;
+  const buckets = [];
+  months.forEach(mo => {
+    if (mo.year < lastYear) {
+      const label = `${mo.year}년`;
+      const hit = buckets.find(b => b.label === label);
+      if (hit) hit.count += mo.count;
+      else buckets.push({ label, count: mo.count });
+    } else {
+      buckets.push({ label: `${String(mo.year).slice(2)}.${mo.key.slice(5)}`, count: mo.count });
+    }
+  });
+  let cum = 0;
+  buckets.forEach(b => { cum += b.count; b.cum = cum; });
+
+  return {
+    total, openCnt, closedCnt,
+    visited, visitRate,
+    purchaseEvidence: ex.purchaseEvidence, sellerCount: ex.sellerCount,
+    mailCount, handCount, noticeTargets, noticeStores, noticeRate,
+    base2, judged, judgeRate, comply: complyTotal, nonComply, nonComplyLegal,
+    types, regions, capitalRate, buckets
+  };
 }
 
-function donutSvg(ratio, color, centerText) {
-  const r = 42, c = 2 * Math.PI * r;
-  const filled = Math.max(0, Math.min(1, ratio)) * c;
-  return `
-    <svg viewBox="0 0 110 110" role="img" aria-label="${Math.round(ratio * 100)}%">
-      <circle cx="55" cy="55" r="${r}" fill="none" stroke="#e5e5ea" stroke-width="12"/>
-      <circle cx="55" cy="55" r="${r}" fill="none" stroke="${color}" stroke-width="12"
-        stroke-linecap="round" stroke-dasharray="${filled} ${c}" transform="rotate(-90 55 55)"/>
-      <text x="55" y="61" text-anchor="middle" font-size="19" font-weight="800" fill="#1d1d1f">${centerText}</text>
-    </svg>`;
+/* ---------------------------------------------------------------------
+   차트 (엑셀 차트 5개에 대응)
+   --------------------------------------------------------------------- */
+const C_OPEN = "#FF3B30", C_CLOSED = "#8e8e93";
+const C_PERIOD = "#007AFF";
+
+function legendHtml(series) {
+  return `<div class="chart-legend">${series.map(s =>
+    `<span class="legend-item"><span class="legend-swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`
+  ).join("")}</div>`;
 }
 
-/* 월별 신규 인입(막대) + 누적(라인) — 축이 달라 위/아래 패널로 분리 */
-function monthlyChartSvg(months) {
-  if (!months.length) return `<div class="stats-empty">인입월 데이터가 없습니다.</div>`;
-  const W = 640, padL = 30, padR = 34;
-  const plotW = W - padL - padR;
-  const n = months.length;
-  const step = plotW / n;
-  const barW = Math.min(30, step * 0.55);
-  const maxCum = Math.max(...months.map(m => m.cum));
-  const maxCnt = Math.max(...months.map(m => m.count), 1);
-
-  // 상단: 누적 라인 (y 18~108) / 하단: 월별 막대 (y 138~226)
-  const cy = v => 108 - (v / maxCum) * 90;
-  const by = v => 226 - (v / maxCnt) * 88;
-  const cx = i => padL + step * i + step / 2;
-
-  const linePts = months.map((m, i) => `${cx(i).toFixed(1)},${cy(m.cum).toFixed(1)}`).join(" ");
-  const areaPts = `${padL + step / 2},108 ${linePts} ${cx(n - 1).toFixed(1)},108`;
-
-  const bars = months.map((m, i) => `
-    <rect x="${(cx(i) - barW / 2).toFixed(1)}" y="${by(m.count).toFixed(1)}" width="${barW.toFixed(1)}"
-      height="${(226 - by(m.count)).toFixed(1)}" rx="4" fill="#007AFF">
-      <title>${m.label} 신규 ${m.count}건</title>
-    </rect>
-    ${m.count ? `<text x="${cx(i).toFixed(1)}" y="${(by(m.count) - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="#48484a">${m.count}</text>` : ""}`).join("");
-
-  const last = months[n - 1];
-  const xLabels = months.map((m, i) => {
-    if (n > 8 && i % 2 === 1 && i !== n - 1) return "";
-    return `<text x="${cx(i).toFixed(1)}" y="242" text-anchor="middle" font-size="9.5" fill="#8e8e93">${m.label}</text>`;
-  }).join("");
-
-  return `
-    <svg viewBox="0 0 ${W} 250" role="img" aria-label="월별 인입 추이">
-      <text x="${padL}" y="12" font-size="10.5" font-weight="700" fill="#8e8e93">누적 인입</text>
-      <polygon points="${areaPts}" fill="rgba(0,122,255,0.08)"/>
-      <polyline points="${linePts}" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linejoin="round"/>
-      ${months.map((m, i) => `<circle cx="${cx(i).toFixed(1)}" cy="${cy(m.cum).toFixed(1)}" r="2.5" fill="#1d1d1f"><title>${m.label} 누적 ${m.cum}건</title></circle>`).join("")}
-      <text x="${(cx(n - 1) + 7).toFixed(1)}" y="${(cy(last.cum) + 4).toFixed(1)}" font-size="11" font-weight="800" fill="#1d1d1f">${last.cum}</text>
-      <line x1="${padL}" y1="108" x2="${W - padR}" y2="108" stroke="#e5e5ea"/>
-      <text x="${padL}" y="132" font-size="10.5" font-weight="700" fill="#8e8e93">월별 신규 인입</text>
-      ${bars}
-      <line x1="${padL}" y1="226" x2="${W - padR}" y2="226" stroke="#e5e5ea"/>
-      ${xLabels}
-    </svg>`;
-}
-
-function hbarListHtml(rows) {
+/* 가로 누적 막대 — 차트15(매장 유형별) · 차트18(1·2차 조치) · 차트19(사법 조치) */
+function stackedBarsHtml(rows, series, opts = {}) {
   if (!rows.length) return `<div class="stats-empty">데이터가 없습니다.</div>`;
-  const max = Math.max(...rows.map(r => r.total));
-  return `<div class="hbar-list">${rows.map(r => {
-    const segs = [
-      r.open ? `<div class="hbar-seg open" style="flex:${r.open}" title="${esc(r.label)} 운영중 ${r.open}개">${r.open / max > 0.05 ? r.open : ""}</div>` : "",
-      r.closed ? `<div class="hbar-seg closed" style="flex:${r.closed}" title="${esc(r.label)} 영업종료 ${r.closed}개">${r.closed / max > 0.05 ? r.closed : ""}</div>` : ""
-    ].join("");
+  const max = Math.max(...rows.map(r => r.values.reduce((a, b) => a + b, 0)), 1);
+  return `<div class="hbar-list${opts.wide ? " wide" : ""}">${rows.map(r => {
+    const sum = r.values.reduce((a, b) => a + b, 0);
+    const segs = r.values.map((v, i) => v
+      ? `<div class="hbar-seg" style="flex:${v};background:${series[i].color}"
+           title="${esc(r.label)} ${esc(series[i].name)} ${v}건">${v / max > 0.05 ? v : ""}</div>`
+      : "").join("");
     return `
       <div class="hbar-row">
         <span class="hbar-label">${esc(r.label)}</span>
-        <div><div class="hbar-track" style="width:${(r.total / max * 100).toFixed(1)}%">${segs}</div></div>
-        <span class="hbar-total">${r.total}</span>
+        <div><div class="hbar-track" style="width:${(sum / max * 100).toFixed(1)}%">${segs}</div></div>
+        <span class="hbar-total">${sum}</span>
       </div>`;
   }).join("")}</div>`;
 }
 
-const OPEN_CLOSED_LEGEND = `
-  <div class="chart-legend">
-    <span class="legend-item"><span class="legend-swatch" style="background:#FF3B30"></span>운영중</span>
-    <span class="legend-item"><span class="legend-swatch" style="background:#8e8e93"></span>영업종료</span>
-  </div>`;
+/* 세로 누적 막대 — 차트17(권역별 침해 매장 현황)
+   viewBox 폭을 카드 실폭(약 1040px)에 맞춰 글자가 축소되지 않게 한다. */
+function stackedColumnSvg(rows) {
+  if (!rows.length) return `<div class="stats-empty">데이터가 없습니다.</div>`;
+  const W = 900, H = 300, padL = 26, padR = 18, top = 34, base = 250, labelY = 276;
+  const plotW = W - padL - padR;
+  const step = plotW / rows.length;
+  const barW = Math.min(96, step * 0.56);
+  const max = Math.max(...rows.map(r => r.total), 1);
+  const h = v => (v / max) * (base - top);
+  const cx = i => padL + step * i + step / 2;
+
+  const cols = rows.map((r, i) => {
+    const hOpen = h(r.open), hClosed = h(r.closed);
+    const yClosed = base - hClosed, yOpen = yClosed - hOpen;
+    const x = cx(i) - barW / 2;
+    const seg = (v, y, hh) => (hh > 20
+      ? `<text x="${cx(i).toFixed(1)}" y="${(y + hh / 2 + 6).toFixed(1)}" text-anchor="middle" font-size="16.5" font-weight="700" fill="#fff">${v}</text>` : "");
+    return `
+      <rect x="${x.toFixed(1)}" y="${yClosed.toFixed(1)}" width="${barW.toFixed(1)}" height="${hClosed.toFixed(1)}" fill="${C_CLOSED}"><title>${esc(r.label)} 영업종료 ${r.closed}개</title></rect>
+      ${seg(r.closed, yClosed, hClosed)}
+      <rect x="${x.toFixed(1)}" y="${yOpen.toFixed(1)}" width="${barW.toFixed(1)}" height="${hOpen.toFixed(1)}" rx="4" fill="${C_OPEN}"><title>${esc(r.label)} 운영중 ${r.open}개</title></rect>
+      ${seg(r.open, yOpen, hOpen)}
+      <text x="${cx(i).toFixed(1)}" y="${(yOpen - 10).toFixed(1)}" text-anchor="middle" font-size="18" font-weight="800" fill="#1d1d1f">${r.total}</text>
+      <text x="${cx(i).toFixed(1)}" y="${labelY}" text-anchor="middle" font-size="17" fill="#48484a">${esc(r.label)}</text>`;
+  }).join("");
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="권역별 침해 매장 현황">
+      <line x1="${padL}" y1="${base}" x2="${W - padR}" y2="${base}" stroke="#e5e5ea"/>
+      ${cols}
+    </svg>`;
+}
+
+/* 월별 신규(막대) + 누적(라인) — 차트16(침해 매장 인입(적발) 현황) */
+function monthlyChartSvg(buckets) {
+  if (!buckets.length) return `<div class="stats-empty">인입월 데이터가 없습니다.</div>`;
+  const W = 900, H = 340, padL = 32, padR = 46;
+  const CUM_BASE = 158, CUM_TOP = 34;      // 상단: 누적 인입(라인)
+  const BAR_BASE = 302, BAR_TOP = 202;     // 하단: 월별 신규(막대)
+  const plotW = W - padL - padR;
+  const n = buckets.length;
+  const step = plotW / n;
+  const barW = Math.min(52, step * 0.5);
+  const maxCum = Math.max(...buckets.map(m => m.cum), 1);
+  const maxCnt = Math.max(...buckets.map(m => m.count), 1);
+
+  const cy = v => CUM_BASE - (v / maxCum) * (CUM_BASE - CUM_TOP);
+  const by = v => BAR_BASE - (v / maxCnt) * (BAR_BASE - BAR_TOP);
+  const cx = i => padL + step * i + step / 2;
+
+  const linePts = buckets.map((m, i) => `${cx(i).toFixed(1)},${cy(m.cum).toFixed(1)}`).join(" ");
+  const areaPts = `${padL + step / 2},${CUM_BASE} ${linePts} ${cx(n - 1).toFixed(1)},${CUM_BASE}`;
+
+  const bars = buckets.map((m, i) => `
+    <rect x="${(cx(i) - barW / 2).toFixed(1)}" y="${by(m.count).toFixed(1)}" width="${barW.toFixed(1)}"
+      height="${(BAR_BASE - by(m.count)).toFixed(1)}" rx="5" fill="${C_PERIOD}">
+      <title>${m.label} 신규 ${m.count}건</title>
+    </rect>
+    ${m.count ? `<text x="${cx(i).toFixed(1)}" y="${(by(m.count) - 8).toFixed(1)}" text-anchor="middle" font-size="16.5" font-weight="700" fill="#48484a">${m.count}</text>` : ""}`).join("");
+
+  const last = buckets[n - 1];
+  const xLabels = buckets.map((m, i) => {
+    if (n > 14 && i % 2 === 1 && i !== n - 1) return "";
+    return `<text x="${cx(i).toFixed(1)}" y="328" text-anchor="middle" font-size="16.5" fill="#8e8e93">${esc(m.label)}</text>`;
+  }).join("");
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 인입 추이">
+      <text x="${padL}" y="21" font-size="16" font-weight="700" fill="#8e8e93">누적 인입</text>
+      <polygon points="${areaPts}" fill="rgba(0,122,255,0.08)"/>
+      <polyline points="${linePts}" fill="none" stroke="#1d1d1f" stroke-width="2.5" stroke-linejoin="round"/>
+      ${buckets.map((m, i) => `<circle cx="${cx(i).toFixed(1)}" cy="${cy(m.cum).toFixed(1)}" r="3.5" fill="#1d1d1f"><title>${m.label} 누적 ${m.cum}건</title></circle>`).join("")}
+      <text x="${(cx(n - 1) + 11).toFixed(1)}" y="${(cy(last.cum) + 6).toFixed(1)}" font-size="18" font-weight="800" fill="#1d1d1f">${last.cum}</text>
+      <line x1="${padL}" y1="${CUM_BASE}" x2="${W - padR}" y2="${CUM_BASE}" stroke="#e5e5ea"/>
+      <text x="${padL}" y="190" font-size="16" font-weight="700" fill="#8e8e93">월별 신규 인입</text>
+      ${bars}
+      <line x1="${padL}" y1="${BAR_BASE}" x2="${W - padR}" y2="${BAR_BASE}" stroke="#e5e5ea"/>
+      ${xLabels}
+    </svg>`;
+}
+
+/* 단계 카드: 진행률 바 + 세부 항목 + 모수 각주 (작성중 시트의 단계 블록) */
+function stageCard(o) {
+  const items = o.items.map(it =>
+    `<li><span>${esc(it.k)}${it.note ? `<em>${esc(it.note)}</em>` : ""}</span>` +
+    `<b>${it.v === null || it.v === undefined ? "-" : it.v + "건"}</b></li>`).join("");
+  const pct = o.ratio === null ? "" : `
+    <div class="stage-rate">
+      <b>${(o.ratio * 100).toFixed(1)}%</b>
+      <div class="stage-bar"><i style="width:${(Math.min(1, Math.max(0, o.ratio)) * 100).toFixed(1)}%;background:${o.color}"></i></div>
+    </div>`;
+  return `
+    <div class="stage-card">
+      <p class="stage-title">${esc(o.title)}</p>
+      ${pct}
+      <ul class="stage-items">${items}</ul>
+      ${o.foot ? `<p class="stage-foot">${o.foot}</p>` : ""}
+    </div>`;
+}
 
 function renderDashboard() {
   const body = document.getElementById("statsBody");
@@ -970,64 +1114,71 @@ function renderDashboard() {
   }
 
   const d = computeDashboard();
-  const doneRate = d.total ? d.doneCnt / d.total : 0;
-  const closeRate = d.total ? d.closedCnt / d.total : 0;
+  const typeRows = d.types.map(t => ({ label: t.label, values: [t.open, t.closed] }));
+  const openClosed = [{ name: "운영중", color: C_OPEN }, { name: "영업종료", color: C_CLOSED }];
 
   body.innerHTML = `
     <p class="stats-section-title">I. 총괄 현황</p>
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label"><span class="dot dot-blue"></span>인입 매장</div>
-        <div class="kpi-value">${d.total}<small>건</small></div>
-        <div class="kpi-hint">당월 신규 ${d.newThisMonth}건</div>
+    <div class="overview-grid">
+      <div class="kpi-card total-card">
+        <div class="kpi-label"><span class="dot dot-red"></span>총 인입건수</div>
+        <div class="kpi-value alert">${d.total}<small>건</small></div>
+        <div class="kpi-hint">운영중 ${d.openCnt}건 · 영업종료 ${d.closedCnt}건</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label"><span class="dot dot-green"></span>1차 조치 완료</div>
-        <div class="kpi-value">${d.hasVisit ? d.doneCnt + '<small>건</small>' : "-"}</div>
-        <div class="kpi-hint">${d.hasVisit ? `완료율 ${(doneRate * 100).toFixed(1)}%` : "방문일자 데이터 없음"}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label"><span class="dot dot-red"></span>운영중 매장</div>
-        <div class="kpi-value alert">${d.openCnt}<small>건</small></div>
-        <div class="kpi-hint">영업종료 ${d.closedCnt}건</div>
+      <div class="chart-card">
+        <p class="chart-title">매장 유형별 운영 현황</p>
+        ${legendHtml(openClosed)}
+        ${stackedBarsHtml(typeRows, openClosed, { wide: true })}
       </div>
     </div>
 
-    <p class="stats-section-title">II. 단계별 대응 추이</p>
-    <div class="chart-card">
-      <p class="chart-title">침해 매장 인입(적발) 현황</p>
-      ${monthlyChartSvg(d.months)}
-    </div>
-    <div class="chart-grid-2">
-      <div class="chart-card">
-        <p class="chart-title">1차 조치 완료율</p>
-        <div class="donut-row">
-          ${donutSvg(doneRate, "#007AFF", d.hasVisit ? (doneRate * 100).toFixed(1) + "%" : "-")}
-          <div class="donut-desc">${d.hasVisit
-            ? `완료 <b>${d.doneCnt}건</b> / ${d.total}건`
-            : "방문일자 데이터가 없습니다.<br/>DB 원본(.xlsm)을 업로드하면 표시됩니다."}</div>
-        </div>
-      </div>
-      <div class="chart-card">
-        <p class="chart-title">영업종료(종결)율</p>
-        <div class="donut-row">
-          ${donutSvg(closeRate, "#34c759", (closeRate * 100).toFixed(1) + "%")}
-          <div class="donut-desc">종료 <b>${d.closedCnt}건</b> / ${d.total}건<br/>현재 운영중 <b style="color:#FF3B30">${d.openCnt}건</b></div>
-        </div>
-      </div>
+    <div class="stage-grid">
+      <section class="stage-group">
+        <p class="stage-head">1차 조치</p>
+        ${stageCard({
+          title: "1차 채증", ratio: d.visitRate, color: C_PERIOD,
+          items: [
+            { k: "가품매장 방문", v: d.visited },
+            { k: "구매 채증", v: d.purchaseEvidence ?? null },
+            { k: "사업자특정", v: d.sellerCount ?? null }
+          ],
+          foot: `${d.total}건 중 ${d.visited}건`
+        })}
+        ${stageCard({
+          title: "최고서 발송", ratio: d.noticeRate, color: C_PERIOD,
+          items: [
+            { k: "우편 발송", note: "*발송 건수", v: d.mailCount },
+            { k: "배달 교부", note: "*사전 포함", v: d.handCount }
+          ],
+          foot: `발송 매장 수 ${d.noticeTargets}건 중 ${d.noticeStores}건`
+        })}
+      </section>
+
+      <section class="stage-group">
+        <p class="stage-head">2차 조치</p>
+        ${stageCard({
+          title: "2차 채증", ratio: d.judgeRate, color: C_PERIOD,
+          items: [
+            { k: "최고 이행", note: "*종료 포함", v: d.comply },
+            { k: "최고 미이행", v: d.nonComply }
+          ],
+          foot: `${d.base2}건 중 ${d.judged}건 · 미이행 중 법적조치 ${d.nonComplyLegal}건 포함`
+        })}
+      </section>
     </div>
 
-    <p class="stats-section-title">III. 매장 실태 분석</p>
-    <div class="chart-grid-2">
+    <p class="stats-section-title">II. 매장 실태 현황</p>
+    <div class="chart-stack">
       <div class="chart-card">
-        <p class="chart-title">권역별 침해 매장 현황</p>
-        ${OPEN_CLOSED_LEGEND}
-        ${hbarListHtml(d.regions)}
+        <p class="chart-title">침해 매장 인입(적발) 현황</p>
+        <div class="chart-scroll">${monthlyChartSvg(d.buckets)}</div>
       </div>
       <div class="chart-card">
-        <p class="chart-title">임대 유형별 침해 매장 현황</p>
-        ${OPEN_CLOSED_LEGEND}
-        ${hbarListHtml(d.types)}
+        <p class="chart-title">권역별 침해 매장 현황
+          <span class="chart-callout">수도권 ${(d.capitalRate * 100).toFixed(0)}%</span>
+        </p>
+        ${legendHtml(openClosed)}
+        <div class="chart-scroll">${stackedColumnSvg(d.regions)}</div>
       </div>
     </div>`;
 }
@@ -1113,15 +1264,35 @@ const FAKE_HEADER_MAP = {
   "id": "id"
 };
 
+/* 'DB' 시트 원본 헤더 → 대시보드 계산용 필드.
+   normalizeKey()는 괄호 안을 지워 '운영 여부'와 '영업상태(오늘)'이 같은 키가 되므로,
+   구분이 필요한 컬럼은 헤더 문자열 그대로 매칭한다(정규화 매칭보다 우선). */
+const FAKE_EXACT_MAP = {
+  "운영 여부": "visitOperating",        // 1차 방문 시점 영업 여부
+  "영업상태(오늘)": "operating",        // 오늘 기준 자동판정 (지도·필터용)
+  "영업종료 판정일": "closedJudgeDate",
+  "조치대상 여부(1차)": "target1",
+  "발송일ⓐ(매장)": "mailA", "발송일ⓑ(본점)": "mailB",
+  "발송일ⓒ(대표자택)": "mailC", "발송일ⓓ(SMS)": "mailD",
+  "도달여부ⓐ": "arrA", "도달여부ⓑ": "arrB", "도달여부ⓒ": "arrC", "도달여부ⓓ": "arrD",
+  "도달일자ⓐ": "arrDateA",
+  "전달일시": "handDate", "교부 시 영업상태": "handStatus",
+  "교부 방문일자": "deliverDate", "교부시 영업여부": "deliverStatus", "교부 여부": "deliverYn",
+  "2차 방문일자": "visit2Date", "2차 운영여부": "op2", "2차 영업상태": "status2",
+  "최고 이행 여부(2차)": "comply2",
+  "사법조치 착수여부": "judStart", "착수(의뢰)일": "judStartDate"
+};
+
 function normalizeKey(k) {
   return String(k || "").trim().toLowerCase().replace(/\s|_|\(.*?\)/g, "");
 }
 
-function mapRow(row, headerMap) {
+function mapRow(row, headerMap, exactMap) {
   const out = {};
   Object.keys(row).forEach(rawKey => {
+    const raw = String(rawKey).trim();
     const nk = normalizeKey(rawKey);
-    const field = headerMap[nk] || headerMap[String(rawKey).trim()];
+    const field = (exactMap && exactMap[raw]) || headerMap[nk] || headerMap[raw];
     if (!field) return;
     const val = fmtCellDate(row[rawKey]);
     // 이미 값이 있는 필드를 빈 값으로 덮어쓰지 않음
@@ -1158,12 +1329,46 @@ function readSheet(file) {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
         // '가품매장관리 DB' 원본(.xlsm)을 그대로 올려도 되도록 DB 시트 우선 사용
         const sheetName = wb.SheetNames.includes("DB") ? "DB" : wb.SheetNames[0];
-        resolve(sheetToRows(wb.Sheets[sheetName]));
+        resolve({ rows: sheetToRows(wb.Sheets[sheetName]), wb });
       } catch (err) { reject(err); }
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
   });
+}
+
+/* DB 시트만으로는 계산할 수 없는 값들을 원본 통합문서의 보조 시트에서 뽑아 둔다.
+   ('제품DB' 구매 채증 건수 · '판매자 정보' 사업자 특정 수 · '최고발송list' 우편 발송일)
+   대시보드계산 시트의 F24/F26/AE67 항목과 같은 모수를 쓴다. */
+function readAuxSheets(wb) {
+  const extra = { purchaseEvidence: null, sellerCount: null, noticeMailDates: null };
+  const cells = name => {
+    const ws = wb.Sheets[name];
+    return ws ? XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) : null;
+  };
+  const filled = v => String(v ?? "").trim() !== "";
+
+  // 제품DB: '채증 회차'(D열)가 채워진 행 수 = 구매 채증 건수
+  const prod = cells("제품DB");
+  if (prod) extra.purchaseEvidence = prod.slice(2).filter(r => filled(r[3])).length;
+
+  // 판매자 정보: 구분(C열)이 '조치대상'인 행 수 = 사업자 특정 건수
+  // (엑셀은 같은 시트의 피벗을 GETPIVOTDATA로 읽으며, 피벗 필터가 구분='조치대상'이다)
+  const seller = cells("판매자 정보");
+  if (seller) {
+    extra.sellerCount = seller.slice(3)
+      .filter(r => filled(r[0]) && String(r[2] ?? "").trim() === "조치대상").length;
+  }
+
+  // 최고발송list: DB 시트에 없는 최고장 우편 발송일(G열)
+  const notice = cells("최고발송list");
+  if (notice) {
+    extra.noticeMailDates = notice
+      .map(r => fmtCellDate(r[6]))
+      .filter(v => /^\d{4}-\d{2}-\d{2}/.test(String(v).trim()))
+      .map(v => String(v).slice(0, 10));
+  }
+  return extra;
 }
 
 /* 시트 → 행 객체 배열.
@@ -1183,11 +1388,20 @@ function sheetToRows(ws) {
 
 async function handleUpload(file, kind) {
   setStatus(`"${file.name}" 읽는 중...`);
-  const rows = await readSheet(file);
+  const { rows, wb } = await readSheet(file);
   if (!rows.length) { setStatus("행이 없습니다. 파일을 확인하세요.", true); return; }
 
   const map_ = kind === "our" ? OUR_HEADER_MAP : FAKE_HEADER_MAP;
-  let mapped = rows.map(r => mapRow(r, map_)).filter(r => r.name || r.address || r.code);
+  const exact_ = kind === "our" ? null : FAKE_EXACT_MAP;
+  let mapped = rows.map(r => mapRow(r, map_, exact_)).filter(r => r.name || r.address || r.code);
+
+  // 가품 DB 원본이면 보조 시트 값도 함께 갱신 (대시보드 전용)
+  if (kind === "fake") {
+    const extra = readAuxSheets(wb);
+    const meta = loadDashboardMeta();
+    Object.keys(extra).forEach(k => { if (extra[k] !== null) meta.extra[k] = extra[k]; });
+    saveDashboardMeta(meta);
+  }
 
   // 좌표 없는 항목 → 주소 지오코딩
   const needGeo = mapped.filter(r => !isValidCoordinate(r.lat, r.lng) && r.address);
@@ -1290,7 +1504,7 @@ function downloadTemplate() {
 
 /* 저장소에 올릴 map-data.json 본문 */
 function mapDataJson() {
-  return JSON.stringify({ exportedAt: Date.now(), fakeStores, ourStores }, null, 2);
+  return JSON.stringify({ exportedAt: Date.now(), fakeStores, ourStores, dashboardMeta: loadDashboardMeta() }, null, 2);
 }
 
 /* 현재 데이터(좌표 포함)를 map-data.json 형식으로 내려받기.

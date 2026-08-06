@@ -380,7 +380,7 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
   overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-.stats-inner { max-width: 900px; margin: 0 auto; padding: 24px 20px 48px; }
+.stats-inner { max-width: 1120px; margin: 0 auto; padding: 24px 20px 48px; }
 .stats-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 12px; margin-bottom: 18px;
@@ -416,14 +416,58 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
 .kpi-hint { font-size: 11.5px; color: #aeaeb2; }
 .dot-green { background: #34c759; }
 
+/* 총괄: 총 인입건수 + 유형별 운영 현황 */
+.overview-grid { display: grid; grid-template-columns: 240px 1fr; gap: 10px; align-items: stretch; }
+.total-card { justify-content: center; }
+.total-card .kpi-value { font-size: 40px; }
+
+/* 단계별 조치 (1차 조치 / 2차 조치) */
+.stage-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; align-items: start; }
+.stage-group { display: grid; gap: 8px; min-width: 0; }
+.stage-head {
+  margin: 0; font-size: 12px; font-weight: 800; color: #fff;
+  background: #1d1d1f; border-radius: 8px; padding: 5px 10px; letter-spacing: .02em;
+}
+.stage-group:nth-child(2) .stage-head { background: #007AFF; }
+.stage-group:first-child { grid-template-columns: 1fr 1fr; }
+.stage-group:first-child .stage-head { grid-column: 1 / -1; }
+
+.stage-card {
+  background: #fff; border-radius: 14px; padding: 14px;
+  box-shadow: var(--shadow-sm); min-width: 0;
+}
+.stage-title { margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.stage-rate { margin-bottom: 10px; }
+.stage-rate b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+.stage-bar { height: 5px; border-radius: 99px; background: #f0f0f2; overflow: hidden; margin-top: 5px; }
+.stage-bar i { display: block; height: 100%; border-radius: 99px; }
+.stage-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; min-width: 0; }
+.stage-items li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.stage-items span { font-size: 12px; color: #48484a; min-width: 0; }
+.stage-items em { display: block; font-style: normal; font-size: 10px; color: #aeaeb2; }
+.stage-items b { font-size: 15px; font-weight: 800; white-space: nowrap; }
+.stage-foot { margin: 9px 0 0; font-size: 11px; color: #aeaeb2; }
+
 /* 차트 카드 */
 .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* II. 매장 실태 현황 — 차트를 한 폭 전체로 크게 */
+.chart-stack { display: grid; gap: 10px; }
+.chart-stack .chart-card { padding: 18px 20px; }
+.chart-stack .chart-title { font-size: 15px; margin-bottom: 12px; }
+.chart-stack .chart-legend { font-size: 13px; gap: 16px; margin-bottom: 10px; }
+.chart-stack .legend-swatch { width: 12px; height: 12px; }
+/* 좁은 화면에서 차트를 줄여 글씨가 작아지는 대신, 가로 스크롤로 크기를 유지 */
+.chart-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .chart-card {
   background: #fff; border-radius: 14px; padding: 16px;
   box-shadow: var(--shadow-sm);
   min-width: 0;
 }
 .chart-title { font-size: 13.5px; font-weight: 700; margin: 0 0 10px; }
+.chart-callout {
+  float: right; font-size: 11.5px; font-weight: 800; color: var(--blue);
+  background: #eaf3ff; border-radius: 999px; padding: 2px 9px;
+}
 .chart-legend {
   display: flex; gap: 12px; flex-wrap: wrap;
   font-size: 11.5px; color: var(--gray-text); margin-bottom: 8px;
@@ -431,12 +475,6 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
 .legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .chart-card svg { display: block; width: 100%; height: auto; }
-
-/* 도넛 + 설명 */
-.donut-row { display: flex; align-items: center; gap: 16px; }
-.donut-row svg { width: 110px; flex: none; }
-.donut-desc { font-size: 12.5px; color: #48484a; line-height: 1.6; min-width: 0; }
-.donut-desc b { font-size: 15px; }
 
 /* 가로 스택 바 */
 .hbar-list { display: grid; gap: 7px; }
@@ -449,16 +487,26 @@ select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.2); border-c
   border-radius: 4px; min-width: 0; overflow: hidden;
   font-size: 10.5px; font-weight: 700; color: #fff;
 }
-.hbar-seg.open { background: var(--red); }
-.hbar-seg.closed { background: #8e8e93; }
+/* 항목명이 긴 차트(유형별·조치별)는 라벨 열을 넓게 */
+.hbar-list.wide .hbar-row { grid-template-columns: 104px 1fr 34px; }
+.hbar-list.wide .hbar-track { height: 22px; }
 .stats-empty {
   background: #fff; border-radius: 14px; padding: 28px; text-align: center;
   color: var(--gray-text); font-size: 13.5px; box-shadow: var(--shadow-sm);
 }
 
+@media (max-width: 900px) {
+  .stage-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 720px) {
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .chart-grid-2 { grid-template-columns: 1fr; }
+  .overview-grid { grid-template-columns: 1fr; }
+  .stage-grid { grid-template-columns: 1fr; }
+  .stage-group:first-child { grid-template-columns: 1fr; }
+  .hbar-list.wide .hbar-row { grid-template-columns: 88px 1fr 30px; }
+  .chart-stack .chart-card { padding: 16px 14px; }
+  .chart-scroll svg { min-width: 700px; }
 }
 @media (max-width: 900px) {
   .stats-overlay { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
