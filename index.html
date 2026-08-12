@@ -28,7 +28,7 @@
       <button type="button" class="rail-item" data-view="list">
         <span class="rail-ico">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-            <circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>
+            <path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor" stroke="none"/>
           </svg>
         </span><span class="rail-label">목록</span>
       </button>
@@ -62,9 +62,9 @@
             </svg>
           </span>
           <input type="search" id="searchInput" placeholder="매장명·주소·상품·상권 검색" />
-          <button type="button" id="searchClear" class="search-clear" aria-label="검색어 지우기" hidden>✕</button>
+          <button type="button" id="searchClear" class="search-clear" aria-label="검색어 지우기" hidden><svg class="ico-x" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <button type="button" class="panel-close" id="panelClose" aria-label="지도 보기">지도 보기 ✕</button>
+        <button type="button" class="panel-close" id="panelClose" aria-label="지도 보기">지도 보기 <svg class="ico-x" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </header>
 
       <!-- 지표 요약 -->
@@ -108,7 +108,7 @@
     </section>
 
     <!-- 패널 접기 손잡이 (네이버 스타일) -->
-    <button type="button" id="panelToggle" class="panel-toggle" aria-label="패널 접기">‹</button>
+    <button type="button" id="panelToggle" class="panel-toggle" aria-label="패널 접기"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
 
     <!-- ===================== ③ 지도 영역 ===================== -->
     <main class="map-area">
@@ -167,16 +167,28 @@
               <h2 class="stats-title">MFG IP 침해 대응 현황 <span class="stats-sub">오프라인</span></h2>
               <p class="stats-date">기준일 <b id="statsDate">-</b> · 업로드된 가품매장 데이터로 자동 계산</p>
             </div>
-            <button type="button" id="statsClose" class="modal-close" aria-label="현황 닫기">✕</button>
+            <button type="button" id="statsClose" class="modal-close" aria-label="현황 닫기"><svg class="ico-x" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
           </header>
           <div class="stats-body" id="statsBody"></div>
         </div>
       </section>
 
+      <!-- 지도를 못 불러왔을 때 (도메인 미등록·네트워크 등) -->
+      <div class="app-error" id="appError" hidden>
+        <div class="app-error-card">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M12 9v4"/><path d="M12 16h.01"/>
+          </svg>
+          <h2 class="app-error-title">지도를 불러오지 못했습니다</h2>
+          <p class="app-error-msg" id="appErrorMsg"></p>
+          <button type="button" class="apple-btn" id="appErrorRetry">다시 시도</button>
+        </div>
+      </div>
+
       <!-- 매장 상세 카드 (지도 인포윈도우 대체: 화면 고정, 내부 스크롤) -->
       <aside class="detail-card" id="detailCard" hidden>
         <button type="button" class="detail-handle" id="detailHandle" aria-label="상세 정보 닫기"></button>
-        <button type="button" class="detail-close" id="detailClose" aria-label="닫기">✕</button>
+        <button type="button" class="detail-close" id="detailClose" aria-label="닫기"><svg class="ico-x" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         <div class="detail-body" id="detailBody"></div>
       </aside>
     </main>
@@ -187,7 +199,7 @@
     <div class="modal">
       <div class="modal-head">
         <span class="modal-title"><span id="adminLock"></span>관리자 데이터 관리</span>
-        <button type="button" id="adminClose" class="modal-close" aria-label="닫기">✕</button>
+        <button type="button" id="adminClose" class="modal-close" aria-label="닫기"><svg class="ico-x" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
 
       <div class="modal-body">
@@ -226,7 +238,7 @@
 
           <!-- GitHub 저장소 자동 반영 -->
           <details class="gh-box" id="ghBox">
-            <summary>GitHub 저장소에 자동 반영 <span class="gh-state" id="ghState">미설정</span></summary>
+            <summary><svg class="gh-caret" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>GitHub 저장소에 자동 반영 <span class="gh-state" id="ghState">미설정</span></summary>
             <p class="hint">설정해두면 파일 업로드 직후 저장소의 <b>map-data.json</b>이 자동으로 갱신되어, 모든 기기·모든 사용자에게 같은 데이터가 표시됩니다.</p>
             <div class="gh-grid">
               <input type="text" id="ghOwner" placeholder="GitHub 아이디 (예: lemonnn2)" autocomplete="off" />

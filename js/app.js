@@ -745,7 +745,8 @@ function renderOurStoreList(stores) {
 
   stores.forEach(store => {
     const nearby = getNearby(store, fakeStores);
-    const card = document.createElement("div");
+    const card = document.createElement("button");
+    card.type = "button";
     card.className = "store-card our";
     card.innerHTML = `
       <div class="store-name">${esc(store.name)}</div>
@@ -766,7 +767,8 @@ function renderFakeStoreList(stores) {
 
   stores.forEach(store => {
     const nearby = getNearby(store, ourStores);
-    const card = document.createElement("div");
+    const card = document.createElement("button");
+    card.type = "button";
     card.className = "store-card fake" + (isClosed(store) ? " closed" : "");
     card.innerHTML = `
       <div class="store-name">${esc(store.name || store.code || "-")}</div>
@@ -985,8 +987,10 @@ function computeDashboard() {
 /* ---------------------------------------------------------------------
    차트 (엑셀 차트 5개에 대응)
    --------------------------------------------------------------------- */
-const C_OPEN = "#FF3B30", C_CLOSED = "#8e8e93";
-const C_PERIOD = "#007AFF";
+/* 차트 계열색. 막대 안에 흰 숫자가 얹히므로 마커색(#FF3B30 / #8e8e93 / #007AFF)보다
+   한 단계 진한 톤을 쓴다 — 같은 색상 계열이라 지도와의 연결은 유지되고 숫자는 읽힌다. */
+const C_OPEN = "#d70015", C_CLOSED = "#6e6e73";
+const C_PERIOD = "#005ec4";
 
 function legendHtml(series) {
   return `<div class="chart-legend">${series.map(s =>
@@ -1801,6 +1805,20 @@ function bindMobileSidebar() {
 /* =====================================================================
    13. 시작
    ===================================================================== */
+/* 지도 로드 실패는 이 앱에서 가장 흔한 사고다(배포 도메인이 카카오 콘솔에 없거나 네트워크).
+   alert 한 줄에 빈 화면을 남기지 말고, 무엇이 잘못됐는지 화면 안에서 말해준다. */
+function showAppError(err) {
+  const box = document.getElementById("appError");
+  const msg = document.getElementById("appErrorMsg");
+  if (!box || !msg) { console.error(err); return; }
+  const sdkFailed = /SDK|도메인|키/.test(err.message || "");
+  msg.textContent = sdkFailed
+    ? "이 주소가 카카오 지도에 등록되어 있지 않거나 네트워크가 끊겼습니다. 잠시 후 다시 시도해도 같으면 담당자에게 알려주세요."
+    : (err.message || "알 수 없는 오류가 발생했습니다.");
+  box.hidden = false;
+  document.getElementById("appErrorRetry").onclick = () => location.reload();
+}
+
 async function main() {
   try {
     await loadKakaoSdk();
@@ -1815,7 +1833,7 @@ async function main() {
     fitAllMarkers();
   } catch (err) {
     console.error(err);
-    alert(err.message);
+    showAppError(err);
   }
 }
 
